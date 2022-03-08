@@ -2,7 +2,22 @@ import time
 
 start = time.time()
 
-def find_palindrom_internal(current_num, bin_num, level, digits, dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache):
+CACHE_SIZE = 13
+
+def check_msb_lookup(current_num, max_dec_add, level, dec_length, bin_length, lookup_cache):
+    if level + 3 != ((dec_length + 1) // 2):
+        return True
+    min_dec = current_num
+    max_dec = current_num + max_dec_add
+    msb_set_digits = bin_length - len(bin(max_dec ^ min_dec)) + 2
+    if msb_set_digits < (level + CACHE_SIZE):
+        return True
+    current_digits = (current_num >> level) % (2**CACHE_SIZE)
+    final_bin_digits = (int(bin(max_dec)[msb_set_digits + 1:1:-1],2) >> level) % (2**CACHE_SIZE)
+    lookup_number = ((final_bin_digits + 2**CACHE_SIZE) - current_digits) % (2**CACHE_SIZE)
+    return lookup_number in lookup_cache
+
+def find_palindrom_internal(current_num, bin_num, level, digits, dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache, lookup_cache):
     if (level + 1) * 2 >= dec_length:
         for digit in digits:
             new_num = current_num + digit * digit_cache[level]
@@ -21,7 +36,10 @@ def find_palindrom_internal(current_num, bin_num, level, digits, dec_length, bin
         if new_bin_num + max_bin_add < new_num or new_num + max_dec_add < new_bin_num:
             continue
 
-        find_palindrom_internal(new_num, new_bin_num, level + 1, range(10), dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache)
+        if not check_msb_lookup(new_num, max_dec_add, level + 1, dec_length, bin_length, lookup_cache):
+            continue
+
+        find_palindrom_internal(new_num, new_bin_num, level + 1, range(10), dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache, lookup_cache)
 
 def get_digit_cache(dec_length):
     cache = []
@@ -33,14 +51,33 @@ def get_digit_cache(dec_length):
 
     return cache
 
+
+def get_lookup_cache(digit_cache):
+    if len(digit_cache) < 3:
+        return
+    cache = set()
+    lsb_set_bits = len(digit_cache) - 3
+    modulo = 2**CACHE_SIZE
+    for i in range(10):
+        for j in range(10):
+            for k in range(10):
+                digits_sum = digit_cache[-1] * i + digit_cache[-2] * j + digit_cache[-3] * k
+                cache.add((digits_sum >> lsb_set_bits) % modulo)
+
+    return cache
+
+
 def get_max_cache(length, base):
     return [base**(length - i) - base**i for i in range(1, (length + 1) // 2)]
 
 def find_palindrome(dec_length, bin_length):
     digit_cache = get_digit_cache(dec_length)
+    lookup_cache = get_lookup_cache(digit_cache)
+    # print(len(lookup_cache))
+    # exit(1)
     max_dec_cache = get_max_cache(dec_length, 10)
     max_bin_cache = get_max_cache(bin_length, 2)
-    find_palindrom_internal(0, 0, 0, range(1, 10, 2), dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache)
+    find_palindrom_internal(0, 0, 0, range(1, 10, 2), dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache, lookup_cache)
 
 def is_possible(dec_length, bin_length):
     max_dec = int("9" * dec_length)
@@ -50,11 +87,14 @@ def is_possible(dec_length, bin_length):
     return min_bin <= max_dec and max_bin >= min_dec
 
 def main():
+    # print(get_max_cache(19, 10))
+    # exit(1)
+    # find_palindrome(25, 81)
     for i in range(10):
         if bin(i)[2:] == bin(i)[:1:-1]:
             print("%.2f: %s" % (time.time() - start, i))
-    dec_length = 2
-    bin_length = 4
+    dec_length = 2 #13
+    bin_length = 4 #41
 
     while True:
         find_palindrome(dec_length, bin_length)

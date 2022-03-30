@@ -1,34 +1,32 @@
+import itertools
 import time
 
 start = time.time()
 
-MIN_CACHE3_SIZE = 10
-MAX_CACHE3_SIZE = 25
-
-MIN_CACHE4_SIZE = 12
-MAX_CACHE4_SIZE = 23
+MIN_CACHE_DIGITS = 1
 
 def check_msb_lookup(current_num, max_dec_add, level, dec_length, bin_length, lookup_cache):
-    if level + 4 == ((dec_length + 1) // 2):
-        cache = lookup_cache[1]
-        min_cache_size = MIN_CACHE4_SIZE
-        max_cache_size = MAX_CACHE4_SIZE
-    elif level + 3 == ((dec_length + 1) // 2):
-        cache = lookup_cache[0]
-        min_cache_size = MIN_CACHE3_SIZE
-        max_cache_size = MAX_CACHE3_SIZE
-    else:
+    digits_left = ((dec_length + 1) // 2) - level
+    if digits_left >= len(lookup_cache):
         return True
+
+    cache = lookup_cache[digits_left]
+
+    if cache is None:
+        return True
+    max_cache_size = len(cache)
 
     max_dec = current_num + max_dec_add
     msb_set_digits = bin_length - len(bin(max_dec ^ current_num)) + 2
-    if msb_set_digits < (level + min_cache_size):
+    cache_digits = min(msb_set_digits - level, len(cache) - 1)
+    if cache_digits < 0 or cache[cache_digits] is None:
         return True
-    cache_digits = min(msb_set_digits - level, max_cache_size)
+
     modulo = 1 << cache_digits
     current_digits = (current_num >> level) % modulo
     final_bin_digits = (int(bin(max_dec)[msb_set_digits + 1:1:-1],2) >> level)
     lookup_number = ((final_bin_digits + modulo) - current_digits) % modulo
+
     return lookup_number in cache[cache_digits]
 
 def find_palindrom_internal(current_num, bin_num, level, digits, dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache, lookup_cache):
@@ -66,52 +64,62 @@ def get_digit_cache(dec_length):
     return cache
 
 
-def get_lookup_cache(digit_cache):
-    if len(digit_cache) < 3:
-        return
+def get_lookup_cache(digit_cache, preprocessing_time):
+    preprocessing_start = time.time()
+    num_digits = MIN_CACHE_DIGITS
+    cache = [None] * MIN_CACHE_DIGITS
+    while time.time() - preprocessing_start < preprocessing_time:
+        lsb_set_bits = len(digit_cache) - num_digits
 
-    cache3 = {}
-    lsb_set_bits = len(digit_cache) - 3
-    for cache_size in range(MIN_CACHE3_SIZE, MAX_CACHE3_SIZE + 1):
-        current_cache = set()
-        modulo = 1 << cache_size
-        for i in range(10):
-            for j in range(10):
-                for k in range(10):
-                    digits_sum = digit_cache[-1] * i + digit_cache[-2] * j + digit_cache[-3] * k
-                    current_cache.add((digits_sum >> lsb_set_bits) % modulo)
+        if lsb_set_bits < 0:
+            return cache
 
-        cache3[cache_size] = current_cache
+        min_log_modulo = len(bin(10**num_digits)) - 2
+        max_log_modulo = len(bin(sum(9 * n for n in digit_cache[-num_digits:]))) - 2
 
-    if len(digit_cache) < 4:
-        return
+        if min_log_modulo > max_log_modulo:
+            return cache
 
-    cache4 = {}
-    lsb_set_bits = len(digit_cache) - 4
-    for cache_size in range(MIN_CACHE4_SIZE, MAX_CACHE4_SIZE + 1):
-        current_cache = set()
-        modulo = 1 << cache_size
-        for i in range(10):
-            for j in range(10):
-                for k in range(10):
-                    for w in range(10):
-                        digits_sum = digit_cache[-1] * i + digit_cache[-2] * j + digit_cache[-3] * k + digit_cache[-4] * w
-                        current_cache.add((digits_sum >> lsb_set_bits) % modulo)
+        sub_cache = [None] * min_log_modulo
+        all_sums = [
+            sum(multipliers[-i] * digit_cache[-i] for i in range(num_digits, 0, -1)) >> lsb_set_bits
+            for multipliers in itertools.product(range(10), repeat=num_digits)
+        ]
 
-        cache4[cache_size] = current_cache
+        for log_modulo in range(min_log_modulo, max_log_modulo):
+            if time.time() - preprocessing_start > preprocessing_time:
+                break
+            modulo = 1 << log_modulo
+            sub_cache.append(set(n % modulo for n in all_sums))
 
-    return (cache3, cache4)
+
+        cache.append(sub_cache)
+        num_digits += 1
+
+    return cache
 
 
 def get_max_cache(length, base):
     return [base**(length - i) - base**i for i in range(1, (length + 1) // 2)]
 
-def find_palindrome(dec_length, bin_length):
-    digit_cache = get_digit_cache(dec_length)
-    lookup_cache = get_lookup_cache(digit_cache)
-    max_dec_cache = get_max_cache(dec_length, 10)
+def find_palindrome_lengths(dec_length, bin_length, digit_cache, lookup_cache, max_dec_cache):
     max_bin_cache = get_max_cache(bin_length, 2)
     find_palindrom_internal(0, 0, 0, range(1, 10, 2), dec_length, bin_length, digit_cache, max_dec_cache, max_bin_cache, lookup_cache)
+
+def find_palindrome(dec_length, max_time):
+    max_bin_length = len(bin(10**dec_length - 1)) - 2
+    min_bin_length = len(bin(10**(dec_length-1) + 1)) - 2
+    digit_cache = get_digit_cache(dec_length)
+    max_dec_cache = get_max_cache(dec_length, 10)
+
+    lookup_cache = get_lookup_cache(digit_cache, max_time * 0.1)
+
+    time_before = time.time()
+
+    for bin_length in range(min_bin_length, max_bin_length + 1):
+        find_palindrome_lengths(dec_length, bin_length, digit_cache, lookup_cache, max_dec_cache)
+
+    return time.time() - time_before
 
 def is_possible(dec_length, bin_length):
     max_dec = int("9" * dec_length)
@@ -121,20 +129,18 @@ def is_possible(dec_length, bin_length):
     return min_bin <= max_dec and max_bin >= min_dec
 
 def main():
-    # find_palindrome(29, 94)
+    # find_palindrome(17, 0.5)
     # exit(1)
     for i in range(10):
         if bin(i)[2:] == bin(i)[:1:-1]:
             print("%.2f: %s" % (time.time() - start, i))
     dec_length = 2 #13
-    bin_length = 4 #41
 
+    max_time = 0
     while True:
-        find_palindrome(dec_length, bin_length)
-        if is_possible(dec_length, bin_length + 1):
-            bin_length += 1
-        else:
-            dec_length += 1
+        search_time = find_palindrome(dec_length, max_time)
+        max_time = max(search_time, max_time)
+        dec_length += 1
 
 if __name__ == '__main__':
     main()

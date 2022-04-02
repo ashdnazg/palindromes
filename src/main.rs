@@ -11,16 +11,17 @@ impl Bits for u256 {
     }
 }
 
-fn find_palindrome_recursive(
+fn find_palindrome_recursive<'a, 'b>(
+    scope: &'a rayon::Scope<'b>,
     current_num: u256,
     bin_num: u256,
     level: u32,
     digits: impl Iterator<Item = u32>,
     dec_length: u32,
     bin_length: u32,
-    digit_cache: &Vec<u256>,
-    max_dec_cache: &Vec<u256>,
-    max_bin_cache: &Vec<u256>,
+    digit_cache: &'b Vec<u256>,
+    max_dec_cache: &'b Vec<u256>,
+    max_bin_cache: &'b Vec<u256>,
     start_time: Instant,
 ) {
     if (level + 1) * 2 >= dec_length {
@@ -50,42 +51,47 @@ fn find_palindrome_recursive(
         if new_bin_num + max_bin_add < new_num || new_num + max_dec_add < new_bin_num {
             continue;
         }
+        scope.spawn(move |scope| {
+            find_palindrome_recursive(
+                scope,
+                new_num,
+                new_bin_num,
+                level + 1,
+                0..10,
+                dec_length,
+                bin_length,
+                digit_cache,
+                max_dec_cache,
+                max_bin_cache,
+                start_time,
+            );
+        });
+    }
+}
 
+fn find_palindrome_internal<'a, 'b>(
+    dec_length: u32,
+    bin_length: u32,
+    digit_cache: &'b Vec<u256>,
+    max_dec_cache: &'b Vec<u256>,
+    start_time: Instant,
+) {
+    let max_bin_cache = get_max_cache(bin_length, 2);
+    rayon::scope(|scope| {
         find_palindrome_recursive(
-            new_num,
-            new_bin_num,
-            level + 1,
-            0..10,
+            scope,
+            u256::ZERO,
+            u256::ZERO,
+            0,
+            (1..10).step_by(2),
             dec_length,
             bin_length,
             digit_cache,
             max_dec_cache,
-            max_bin_cache,
+            &max_bin_cache,
             start_time,
         );
-    }
-}
-
-fn find_palindrome_internal(
-    dec_length: u32,
-    bin_length: u32,
-    digit_cache: &Vec<u256>,
-    max_dec_cache: &Vec<u256>,
-    start_time: Instant,
-) {
-    let max_bin_cache = get_max_cache(bin_length, 2);
-    find_palindrome_recursive(
-        u256::ZERO,
-        u256::ZERO,
-        0,
-        (1..10).step_by(2),
-        dec_length,
-        bin_length,
-        digit_cache,
-        max_dec_cache,
-        &max_bin_cache,
-        start_time,
-    );
+    })
 }
 
 fn find_palindrome(dec_length: u32, start_time: Instant) {
@@ -94,21 +100,17 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
     let digit_cache = get_digit_cache(dec_length);
     let max_dec_cache = get_max_cache(dec_length, 10);
 
-    rayon::scope_fifo(|scope| {
-        (min_bin_length..=max_bin_length).for_each(|bin_length| {
-            let digit_cache_ref = &digit_cache;
-            let max_dec_cache_ref = &max_dec_cache;
-            scope.spawn_fifo(move |_| {
-                find_palindrome_internal(
-                    dec_length,
-                    bin_length,
-                    digit_cache_ref,
-                    max_dec_cache_ref,
-                    start_time,
-                )
-            });
-        });
-    })
+    (min_bin_length..=max_bin_length).for_each(|bin_length| {
+        let digit_cache_ref = &digit_cache;
+        let max_dec_cache_ref = &max_dec_cache;
+        find_palindrome_internal(
+            dec_length,
+            bin_length,
+            digit_cache_ref,
+            max_dec_cache_ref,
+            start_time,
+        )
+    });
 }
 
 fn get_max_cache(length: u32, base: u32) -> Vec<u256> {

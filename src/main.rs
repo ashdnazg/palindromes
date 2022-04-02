@@ -1,8 +1,8 @@
+#![allow(clippy::too_many_arguments)]
 use ethnum::u256;
 use hashbrown::HashSet;
 use once_cell::sync::OnceCell;
 use std::{
-    ops::Range,
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
     time::Instant,
 };
@@ -21,9 +21,8 @@ fn encode_ten_thousands(hi: u64, lo: u64) -> u64 {
     let merged: u64 = hi | (lo << 32);
     let top = ((merged * 10486u64) >> 20) & ((0x7Fu64 << 32) | 0x7Fu64);
     let bot = merged - 100u64 * top;
-    let mut tens;
     let hundreds = (bot << 16) + top;
-    tens = (hundreds * 103u64) >> 10;
+    let mut tens = (hundreds * 103u64) >> 10;
     tens &= (0xFu64 << 48) | (0xFu64 << 32) | (0xFu64 << 16) | 0xFu64;
     tens += (hundreds - 10u64 * tens) << 8;
 
@@ -41,18 +40,21 @@ fn to_digits(x: u64) -> u128 {
 #[derive(Clone, Debug)]
 struct LevelTable {
     // index is number of known bits.
-    sub_caches: Vec<OnceCell<HashSet<u256>>>,
+    sub_caches: Vec<OnceCell<HashSet<u64>>>,
 }
 
 impl LevelTable {
     fn new(num_digits: u32, digit_cache: &[u256]) -> Self {
         let level = digit_cache.len() as u32 - num_digits;
-        let max_known_bits = digit_cache
-            .iter()
-            .skip(level as usize)
-            .map(|n| n * 9)
-            .sum::<u256>()
-            .bits();
+        let max_known_bits = u32::min(
+            digit_cache
+                .iter()
+                .skip(level as usize)
+                .map(|n| n * 9)
+                .sum::<u256>()
+                .bits(),
+            63,
+        );
 
         Self {
             sub_caches: vec![OnceCell::new(); (max_known_bits + 1) as usize],
@@ -61,33 +63,30 @@ impl LevelTable {
 
     fn generate(&self, num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) {
         let level = digit_cache.len() as u32 - num_digits;
-        let min_known_bits = u256::from(10u32).pow(num_digits).bits();
-        let max_known_bits = digit_cache
-            .iter()
-            .skip(level as usize)
-            .map(|n| n * 9)
-            .sum::<u256>()
-            .bits();
+        let min_known_bits = u256::from(10u32).pow(num_digits).bits() as usize;
         let sub_cache_size = 10u64.pow(num_digits);
 
         if cancel_marker.load(Ordering::Acquire) {
             return;
         }
 
-        let mut sub_caches = vec![HashSet::new(); (max_known_bits + 1) as usize]; //Vec::with_capacity((max_known_bits - min_known_bits + 1) as usize);
+        let mut sub_caches = vec![HashSet::new(); self.sub_caches.len()];
 
         for n in 0..sub_cache_size {
             if cancel_marker.load(Ordering::Acquire) {
                 return;
             }
             let digits = to_digits(n);
-            let mut sum = u256::ZERO;
+            let mut sum = 0u64;
             for i in 0..num_digits {
                 let digit = (digits >> (120 - i * 8)) & 15;
-                sum += (digit_cache[(level + i) as usize] * digit) >> level;
+                sum = sum.wrapping_add(
+                    *((digit_cache[(level + i) as usize] * digit) >> level).low() as u64,
+                );
             }
-            for known_bits in min_known_bits..(max_known_bits + 1) {
-                sub_caches[known_bits as usize].insert(sum & ((1 << known_bits) - 1));
+            for known_bits in min_known_bits..self.sub_caches.len() {
+                let mask = (1 << known_bits) - 1;
+                sub_caches[known_bits].insert(sum & mask);
             }
         }
 
@@ -105,10 +104,10 @@ impl LevelTable {
 
     fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
         if let Some(sub_cache) = self.sub_caches[known_bits as usize].get() {
-            let mask = (u256::ONE << known_bits) - 1;
-            let current_bits = current_num >> level;
+            let mask = (1u64 << known_bits) - 1;
+            let current_bits = *(current_num >> level).low() as u64;
             let final_bits = current_num.reverse_bits() >> (256 + level - bin_length);
-            let lookup_bits = final_bits.wrapping_sub(current_bits) & mask;
+            let lookup_bits = (*final_bits.low() as u64).wrapping_sub(current_bits) & mask;
 
             let ret = sub_cache.contains(&lookup_bits);
             return ret;
@@ -148,8 +147,8 @@ impl LookupTable {
     }
 
     fn lookup(&self, current_num: u256, max_dec: u256, level: u32, bin_length: u32) -> bool {
-        let msb_set_bits = bin_length - (max_dec ^ current_num).bits();
-        if level > msb_set_bits {
+        let msb_set_bits = (bin_length as i32) - ((max_dec ^ current_num).bits() as i32);
+        if (level as i32) > msb_set_bits {
             return true;
         }
 
@@ -157,7 +156,7 @@ impl LookupTable {
             .get()
             .map_or(true, |level_table| {
                 let known_bits = u32::min(
-                    msb_set_bits - level,
+                    (msb_set_bits as u32) - level,
                     level_table.sub_caches.len() as u32 - 1,
                 );
                 level_table.lookup(current_num, level, known_bits, bin_length)
@@ -261,7 +260,12 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
     let cancel = AtomicBool::new(false);
     let finished_count = AtomicU32::new(0);
 
-    rayon::scope_fifo(|scope| {
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(rayon::current_num_threads() + 1)
+        .build()
+        .unwrap();
+
+    pool.scope_fifo(|scope| {
         for bin_length in min_bin_length..=max_bin_length {
             let digit_cache_ref = &digit_cache;
             let max_dec_cache_ref = &max_dec_cache;
@@ -285,7 +289,7 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
             });
         }
 
-        for num_digits in 2..8 {
+        for num_digits in 2..7 {
             let digit_cache_ref = &digit_cache;
             let cancel_ref = &cancel;
             let lookup_table_ref = &lookup_table;
@@ -325,10 +329,4 @@ fn main() {
         find_palindrome(dec_length, start_time);
         dec_length += 1;
     }
-
-    // let digit_cache = get_digit_cache(10);
-
-    // let level_table = LevelTable::new(3, &digit_cache);
-
-    // println!("{:?}", level_table.sub_caches);
 }

@@ -106,8 +106,14 @@ impl LevelTable {
         if let Some(sub_cache) = self.sub_caches[known_bits as usize].get() {
             let mask = (1u64 << known_bits) - 1;
             let current_bits = *(current_num >> level).low() as u64;
-            let final_bits = current_num.reverse_bits() >> (256 + level - bin_length);
-            let lookup_bits = (*final_bits.low() as u64).wrapping_sub(current_bits) & mask;
+            let shift = bin_length as i32 - level as i32 - 64;
+            let final_bits = (if shift > 0 {
+                *(current_num >> shift).low() as u64
+            } else {
+                (*current_num.low() as u64) << -shift
+            }).reverse_bits();
+
+            let lookup_bits = final_bits.wrapping_sub(current_bits) & mask;
 
             let ret = sub_cache.contains(&lookup_bits);
             return ret;
@@ -261,7 +267,7 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
     let finished_count = AtomicU32::new(0);
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(rayon::current_num_threads() + 1)
+        .num_threads(usize::max(rayon::current_num_threads(), (max_bin_length - min_bin_length + 2) as usize))
         .build()
         .unwrap();
 

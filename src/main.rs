@@ -22,6 +22,12 @@ impl Bits for u64 {
     }
 }
 
+impl Bits for usize {
+    fn bits(&self) -> u32 {
+        Self::BITS - self.leading_zeros()
+    }
+}
+
 fn encode_ten_thousands(hi: u64, lo: u64) -> u64 {
     let merged: u64 = hi | (lo << 32);
     let top = ((merged * 10486u64) >> 20) & ((0x7Fu64 << 32) | 0x7Fu64);
@@ -45,31 +51,31 @@ fn to_digits(x: u64) -> u128 {
 #[derive(Clone, Debug)]
 struct LevelTable {
     // sorted vector of reversed suffixes of the sum of the digits after this level.
-    suffixes: OnceCell<Vec<u64>>,
+    suffixes: Vec<u64>,
     min_known_bits: u32,
+    log_expanded_size: u32
 }
 
 impl LevelTable {
-    fn new(num_digits: u32) -> Self {
-        Self {
-            suffixes: OnceCell::new(),
+    fn new(num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) -> Self {
+        let mut instance = Self {
+            suffixes: Vec::new(),
             min_known_bits: 10u64.pow(num_digits).bits(),
-        }
-    }
+            log_expanded_size: 0,
+        };
 
-    fn generate(&self, num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) {
         let level = digit_cache.len() as u32 - num_digits;
         let sub_cache_size = 10u64.pow(num_digits);
 
         if cancel_marker.load(Ordering::Acquire) {
-            return;
+            return instance;
         }
 
         let mut suffixes = Vec::with_capacity(sub_cache_size as usize);
 
         for n in 0..sub_cache_size {
             if cancel_marker.load(Ordering::Acquire) {
-                return;
+                return instance;
             }
             let digits = to_digits(n);
             let mut sum = 0u64;
@@ -81,9 +87,27 @@ impl LevelTable {
             }
             suffixes.push(sum.reverse_bits())
         }
-        suffixes.sort();
+        suffixes.sort_unstable();
 
-        self.suffixes.set(suffixes).unwrap();
+        instance.log_expanded_size = suffixes.len().bits();
+        let expanded_size = 1 << suffixes.len().bits();
+
+        instance.suffixes.reserve(expanded_size + 64);
+
+        for suffix in suffixes.iter() {
+            let wanted_index = suffix >> (u64::BITS - instance.log_expanded_size);
+            loop {
+                instance.suffixes.push(*suffix);
+                if (wanted_index as usize) < instance.suffixes.len() {
+                    break;
+                }
+            }
+            if cancel_marker.load(Ordering::Acquire) {
+                return instance;
+            }
+        }
+
+        instance
     }
 
     fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
@@ -91,22 +115,33 @@ impl LevelTable {
             return true;
         }
 
-        if let Some(suffixes) = self.suffixes.get() {
-            let mask = ((1u64 << known_bits) - 1).reverse_bits();
-            let current_bits = *(current_num >> level).low() as u64;
-            let shift = bin_length as i32 - level as i32 - 64;
-            let final_bits = (if shift > 0 {
-                *(current_num >> shift).low() as u64
-            } else {
-                (*current_num.low() as u64) << -shift
-            }).reverse_bits();
+        let current_bits = *(current_num >> level).low() as u64;
+        let shift = bin_length as i32 - level as i32 - 64;
+        let final_bits = (if shift > 0 {
+            *(current_num >> shift).low() as u64
+        } else {
+            (*current_num.low() as u64) << -shift
+        }).reverse_bits();
 
-            let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
+        let mask = ((1u64 << known_bits) - 1).reverse_bits();
+        let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
 
-            let ret = suffixes.binary_search_by_key(&lookup_bits, |s| s & mask).is_ok();
-            return ret;
+        let guess_index = usize::min((lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize, self.suffixes.len() - 1);
+        match (self.suffixes[guess_index] & mask).cmp(&lookup_bits) {
+            std::cmp::Ordering::Less => {
+                let result = self.suffixes[guess_index..].iter().skip(1).find(|&s| {
+                    s & mask >= lookup_bits
+                });
+                result.map_or(false, |s| { s & mask == lookup_bits })
+            },
+            std::cmp::Ordering::Equal => true,
+            std::cmp::Ordering::Greater => {
+                let result = self.suffixes[..guess_index].iter().rev().find(|&s| {
+                    s & mask <= lookup_bits
+                });
+                result.map_or(false, |s| { s & mask == lookup_bits })
+            },
         }
-        true
     }
 }
 
@@ -133,11 +168,10 @@ impl LookupTable {
         }
 
         let level = digit_cache.len() - num_digits as usize;
-        let level_table = LevelTable::new(num_digits);
+        let level_table = LevelTable::new(num_digits, digit_cache, cancel_marker);
         self.sub_caches[level]
-            .try_insert(level_table)
-            .unwrap()
-            .generate(num_digits, digit_cache, cancel_marker);
+            .set(level_table)
+            .unwrap();
     }
 
     fn lookup(&self, current_num: u256, max_dec: u256, level: u32, bin_length: u32) -> bool {
@@ -279,7 +313,7 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
             });
         }
 
-        for num_digits in 2..9 {
+        for num_digits in 2..10 {
             let digit_cache_ref = &digit_cache;
             let cancel_ref = &cancel;
             let lookup_table_ref = &lookup_table;

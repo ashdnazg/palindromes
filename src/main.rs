@@ -319,6 +319,9 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
             let lookup_table_ref = &lookup_table;
             scope.spawn_fifo(move |_| {
                 lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref);
+                if !cancel_ref.load(Ordering::Relaxed) {
+                    println!("finished generating digit {}", num_digits);
+                }
             })
         }
     })

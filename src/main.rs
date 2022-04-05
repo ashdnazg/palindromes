@@ -53,11 +53,11 @@ struct LevelTable {
     // sorted vector of reversed suffixes of the sum of the digits after this level.
     suffixes: Vec<u64>,
     min_known_bits: u32,
-    log_expanded_size: u32
+    log_expanded_size: u32,
 }
 
 impl LevelTable {
-    fn new(num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) -> Self {
+    fn new(num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) -> Option<Self> {
         let mut instance = Self {
             suffixes: Vec::new(),
             min_known_bits: 10u64.pow(num_digits).bits(),
@@ -68,14 +68,14 @@ impl LevelTable {
         let sub_cache_size = 10u64.pow(num_digits);
 
         if cancel_marker.load(Ordering::Acquire) {
-            return instance;
+            return None;
         }
 
         let mut suffixes = Vec::with_capacity(sub_cache_size as usize);
 
         for n in 0..sub_cache_size {
             if cancel_marker.load(Ordering::Acquire) {
-                return instance;
+                return None;
             }
             let digits = to_digits(n);
             let mut sum = 0u64;
@@ -103,11 +103,11 @@ impl LevelTable {
                 }
             }
             if cancel_marker.load(Ordering::Acquire) {
-                return instance;
+                return None;
             }
         }
 
-        instance
+        Some(instance)
     }
 
     fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
@@ -121,27 +121,21 @@ impl LevelTable {
             *(current_num >> shift).low() as u64
         } else {
             (*current_num.low() as u64) << -shift
-        }).reverse_bits();
+        })
+        .reverse_bits();
 
         let mask = ((1u64 << known_bits) - 1).reverse_bits();
         let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
 
-        let guess_index = usize::min((lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize, self.suffixes.len() - 1);
-        match (self.suffixes[guess_index] & mask).cmp(&lookup_bits) {
-            std::cmp::Ordering::Less => {
-                let result = self.suffixes[guess_index..].iter().skip(1).find(|&s| {
-                    s & mask >= lookup_bits
-                });
-                result.map_or(false, |s| { s & mask == lookup_bits })
-            },
-            std::cmp::Ordering::Equal => true,
-            std::cmp::Ordering::Greater => {
-                let result = self.suffixes[..guess_index].iter().rev().find(|&s| {
-                    s & mask <= lookup_bits
-                });
-                result.map_or(false, |s| { s & mask == lookup_bits })
-            },
-        }
+        let guess_index = usize::min(
+            (lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize,
+            self.suffixes.len() - 1,
+        );
+
+        self.suffixes[guess_index..]
+            .iter()
+            .find(|&s| s & mask >= lookup_bits)
+            .map_or(false, |s| s & mask == lookup_bits)
     }
 }
 
@@ -158,20 +152,21 @@ impl LookupTable {
         }
     }
 
-    fn generate(&self, num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) {
+    fn generate(&self, num_digits: u32, digit_cache: &[u256], cancel_marker: &AtomicBool) -> bool {
         if num_digits as usize > digit_cache.len() {
-            return;
+            return false;
         }
 
         if cancel_marker.load(Ordering::Acquire) {
-            return;
+            return false;
         }
 
         let level = digit_cache.len() - num_digits as usize;
-        let level_table = LevelTable::new(num_digits, digit_cache, cancel_marker);
-        self.sub_caches[level]
-            .set(level_table)
-            .unwrap();
+        if let Some(level_table) = LevelTable::new(num_digits, digit_cache, cancel_marker) {
+            self.sub_caches[level].set(level_table).unwrap();
+        }
+
+        !cancel_marker.load(Ordering::SeqCst)
     }
 
     fn lookup(&self, current_num: u256, max_dec: u256, level: u32, bin_length: u32) -> bool {
@@ -183,7 +178,12 @@ impl LookupTable {
         self.sub_caches[level as usize]
             .get()
             .map_or(true, |level_table| {
-                level_table.lookup(current_num, level, (msb_set_bits as u32) - level, bin_length)
+                level_table.lookup(
+                    current_num,
+                    level,
+                    (msb_set_bits as u32) - level,
+                    bin_length,
+                )
             })
     }
 }
@@ -285,9 +285,18 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
     let finished_count = AtomicU32::new(0);
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(usize::max(rayon::current_num_threads(), (max_bin_length - min_bin_length + 2) as usize))
+        .num_threads(usize::max(
+            rayon::current_num_threads(),
+            (max_bin_length - min_bin_length + 2) as usize,
+        ))
         .build()
         .unwrap();
+
+    println!(
+        "{:.2}: Starting decimal length: {}",
+        start_time.elapsed().as_secs_f32(),
+        dec_length
+    );
 
     pool.scope_fifo(|scope| {
         for bin_length in min_bin_length..=max_bin_length {
@@ -310,6 +319,11 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
                 {
                     cancel_ref.store(true, Ordering::Relaxed);
                 }
+                println!(
+                    "{:.2}: Finished binary length: {}",
+                    start_time.elapsed().as_secs_f32(),
+                    bin_length
+                );
             });
         }
 
@@ -318,9 +332,12 @@ fn find_palindrome(dec_length: u32, start_time: Instant) {
             let cancel_ref = &cancel;
             let lookup_table_ref = &lookup_table;
             scope.spawn_fifo(move |_| {
-                lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref);
-                if !cancel_ref.load(Ordering::Relaxed) {
-                    println!("finished generating digit {}", num_digits);
+                if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
+                    println!(
+                        "{:.2}: Generated table for num_digits: {}",
+                        start_time.elapsed().as_secs_f32(),
+                        num_digits
+                    );
                 }
             })
         }

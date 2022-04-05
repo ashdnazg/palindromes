@@ -111,9 +111,10 @@ impl LevelTable {
     }
 
     fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
-        if known_bits < self.min_known_bits || known_bits > 64 {
+        if known_bits < self.min_known_bits {
             return true;
         }
+        let known_bits = u32::min(known_bits, 64);
 
         let current_bits = *(current_num >> level).low() as u64;
         let shift = bin_length as i32 - level as i32 - 64;
@@ -124,7 +125,7 @@ impl LevelTable {
         })
         .reverse_bits();
 
-        let mask = ((1u64 << known_bits) - 1).reverse_bits();
+        let mask = (1u64.wrapping_shl(known_bits) - 1).reverse_bits();
         let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
 
         let guess_index = usize::min(

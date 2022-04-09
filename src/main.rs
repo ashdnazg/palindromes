@@ -276,73 +276,85 @@ fn find_palindrome_internal(
     );
 }
 
-fn find_palindrome(dec_length: u32, start_time: Instant) {
-    let max_bin_length = (u256::from(10u32).pow(dec_length) - 1).bits();
-    let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
-    let digit_cache = get_digit_cache(dec_length);
-    let max_dec_cache = get_max_cache(dec_length, 10);
-    let lookup_table = LookupTable::new(&digit_cache);
-    let cancel = AtomicBool::new(false);
-    let finished_count = AtomicU32::new(0);
+fn find_palindrome(starting_length: u32, start_time: Instant) {
+    let mut dec_length = starting_length;
+    loop {
+        let max_bin_length = (u256::from(10u32).pow(dec_length) - 1).bits();
+        let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
+        let digit_cache = get_digit_cache(dec_length);
+        let max_dec_cache = get_max_cache(dec_length, 10);
+        let lookup_table = LookupTable::new(&digit_cache);
+        let cancel = AtomicBool::new(false);
+        let finished_count = AtomicU32::new(0);
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(usize::max(
-            rayon::current_num_threads(),
-            (max_bin_length - min_bin_length + 2) as usize,
-        ))
-        .build()
-        .unwrap();
+        // let pool = rayon::ThreadPoolBuilder::new()
+        //     .num_threads(usize::max(
+        //         rayon::current_num_threads(),
+        //         (max_bin_length - min_bin_length + 2) as usize,
+        //     ))
+        //     .build()
+        //     .unwrap();
 
-    println!(
-        "{:.2}: Starting decimal length: {}",
-        start_time.elapsed().as_secs_f32(),
-        dec_length
-    );
+        println!(
+            "{:.2}: Starting decimal length: {}",
+            start_time.elapsed().as_secs_f32(),
+            dec_length
+        );
 
-    pool.scope_fifo(|scope| {
-        for bin_length in min_bin_length..=max_bin_length {
-            let digit_cache_ref = &digit_cache;
-            let max_dec_cache_ref = &max_dec_cache;
-            let lookup_table_ref = &lookup_table;
-            let finished_count_ref = &finished_count;
-            let cancel_ref = &cancel;
-            scope.spawn_fifo(move |_| {
-                find_palindrome_internal(
-                    dec_length,
-                    bin_length,
-                    digit_cache_ref,
-                    max_dec_cache_ref,
-                    lookup_table_ref,
-                    start_time,
-                );
-                if finished_count_ref.fetch_add(1, Ordering::Release)
-                    == (max_bin_length - min_bin_length)
-                {
-                    cancel_ref.store(true, Ordering::Relaxed);
-                }
-                println!(
-                    "{:.2}: Finished binary length: {}",
-                    start_time.elapsed().as_secs_f32(),
-                    bin_length
-                );
-            });
-        }
-
-        for num_digits in 2..10 {
-            let digit_cache_ref = &digit_cache;
-            let cancel_ref = &cancel;
-            let lookup_table_ref = &lookup_table;
-            scope.spawn_fifo(move |_| {
-                if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
+        rayon::scope_fifo(|scope| {
+            for bin_length in min_bin_length..=max_bin_length {
+                let digit_cache_ref = &digit_cache;
+                let max_dec_cache_ref = &max_dec_cache;
+                let lookup_table_ref = &lookup_table;
+                let finished_count_ref = &finished_count;
+                let cancel_ref = &cancel;
+                scope.spawn_fifo(move |_| {
                     println!(
-                        "{:.2}: Generated table for num_digits: {}",
+                        "{:.2}: Started decimal length {}, binary length: {}",
                         start_time.elapsed().as_secs_f32(),
-                        num_digits
+                        dec_length,
+                        bin_length
                     );
-                }
-            })
-        }
-    })
+                    find_palindrome_internal(
+                        dec_length,
+                        bin_length,
+                        digit_cache_ref,
+                        max_dec_cache_ref,
+                        lookup_table_ref,
+                        start_time,
+                    );
+                    if finished_count_ref.fetch_add(1, Ordering::Release)
+                        == (max_bin_length - min_bin_length)
+                    {
+                        cancel_ref.store(true, Ordering::Relaxed);
+                    }
+                    println!(
+                        "{:.2}: Finished decimal length {}, binary length: {}",
+                        start_time.elapsed().as_secs_f32(),
+                        dec_length,
+                        bin_length
+                    );
+                });
+            }
+
+            for num_digits in 2..10 {
+                let digit_cache_ref = &digit_cache;
+                let cancel_ref = &cancel;
+                let lookup_table_ref = &lookup_table;
+                scope.spawn_fifo(move |_| {
+                    if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
+                        println!(
+                            "{:.2}: Generated table for decimal length {}, num_digits: {}",
+                            start_time.elapsed().as_secs_f32(),
+                            dec_length,
+                            num_digits
+                        );
+                    }
+                })
+            }
+        });
+        dec_length += 2;
+    }
 }
 
 fn get_max_cache(length: u32, base: u32) -> Vec<u256> {
@@ -369,9 +381,13 @@ fn get_digit_cache(dec_length: u32) -> Vec<u256> {
 
 fn main() {
     let start_time = Instant::now();
-    let mut dec_length = 2;
-    loop {
-        find_palindrome(dec_length, start_time);
-        dec_length += 1;
-    }
+    let dec_length = 50;
+    rayon::scope_fifo(|scope| {
+        scope.spawn_fifo(|_| {
+            find_palindrome(dec_length, start_time);
+        });
+        scope.spawn_fifo(|_| {
+            find_palindrome(dec_length + 1, start_time);
+        });
+    });
 }

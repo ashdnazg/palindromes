@@ -1,0 +1,721 @@
+0.00: Starting decimal length: 2
+0.00: Starting decimal length: 3
+0.00: Started decimal length 2, binary length: 4
+0.00: Finished decimal length 2, binary length: 4
+0.00: Started decimal length 2, binary length: 5
+0.00: Started decimal length 3, binary length: 8
+0.00: Started decimal length 3, binary length: 9
+0.00: Started decimal length 3, binary length: 7
+0.00: Finished decimal length 3, binary length: 8
+0.00: 313
+0.00: Finished decimal length 3, binary length: 7
+0.00: Finished decimal length 2, binary length: 5
+0.00: Generated table for decimal length 3, num_digits: 2
+0.00: Started decimal length 3, binary length: 10
+0.00: Finished decimal length 3, binary length: 9
+0.00: 585
+0.00: 717
+0.00: Finished decimal length 3, binary length: 10
+0.00: Started decimal length 2, binary length: 7
+0.00: Started decimal length 2, binary length: 6
+0.00: 33
+0.00: Finished decimal length 2, binary length: 6
+0.00: 99
+0.00: Finished decimal length 2, binary length: 7
+0.00: Starting decimal length: 5
+0.00: Started decimal length 5, binary length: 14
+0.00: Started decimal length 5, binary length: 15
+0.00: 32223
+0.00: Finished decimal length 5, binary length: 15
+0.00: 15351
+0.00: Finished decimal length 5, binary length: 14
+0.00: Starting decimal length: 4
+0.00: Generated table for decimal length 5, num_digits: 2
+0.00: Started decimal length 5, binary length: 17
+0.00: Started decimal length 4, binary length: 11
+0.00: Started decimal length 4, binary length: 13
+0.00: Started decimal length 5, binary length: 16
+0.00: Finished decimal length 4, binary length: 11
+0.00: Generated table for decimal length 5, num_digits: 3
+0.00: Started decimal length 4, binary length: 12
+0.00: 73737
+0.00: Generated table for decimal length 4, num_digits: 2
+0.00: Finished decimal length 5, binary length: 17
+0.00: 39993
+0.00: Started decimal length 4, binary length: 10
+0.00: 53235
+0.00: Finished decimal length 4, binary length: 12
+0.00: Started decimal length 4, binary length: 14
+0.00: 9009
+0.00: Finished decimal length 4, binary length: 14
+0.00: Finished decimal length 4, binary length: 10
+0.00: 53835
+0.00: Finished decimal length 5, binary length: 16
+0.00: 7447
+0.00: Finished decimal length 4, binary length: 13
+0.00: Starting decimal length: 6
+0.00: Started decimal length 6, binary length: 17
+0.00: Finished decimal length 6, binary length: 17
+0.00: Started decimal length 6, binary length: 18
+0.00: Finished decimal length 6, binary length: 18
+0.00: Started decimal length 6, binary length: 19
+0.00: Finished decimal length 6, binary length: 19
+0.00: Started decimal length 6, binary length: 20
+0.00: 585585
+0.00: Finished decimal length 6, binary length: 20
+0.00: Starting decimal length: 8
+0.00: Started decimal length 8, binary length: 24
+0.00: 13500531
+0.00: Finished decimal length 8, binary length: 24
+0.00: Started decimal length 8, binary length: 25
+0.00: Finished decimal length 8, binary length: 25
+0.00: Started decimal length 8, binary length: 26
+0.00: Finished decimal length 8, binary length: 26
+0.00: Started decimal length 8, binary length: 27
+0.00: Finished decimal length 8, binary length: 27
+0.00: Starting decimal length: 10
+0.00: Started decimal length 10, binary length: 30
+0.00: Finished decimal length 10, binary length: 30
+0.00: Started decimal length 10, binary length: 31
+0.00: 1290880921
+0.00: Finished decimal length 10, binary length: 31
+0.00: Started decimal length 10, binary length: 32
+0.00: Finished decimal length 10, binary length: 32
+0.00: Started decimal length 10, binary length: 33
+0.00: Started decimal length 10, binary length: 34
+0.00: 7451111547
+0.00: Finished decimal length 10, binary length: 34
+0.00: Finished decimal length 10, binary length: 33
+0.00: Starting decimal length: 12
+0.00: Started decimal length 12, binary length: 37
+0.00: 110948849011
+0.00: Started decimal length 12, binary length: 38
+0.00: 136525525631
+0.00: Finished decimal length 12, binary length: 37
+0.00: Started decimal length 12, binary length: 39
+0.00: Finished decimal length 12, binary length: 38
+0.00: Started decimal length 12, binary length: 40
+0.00: Finished decimal length 12, binary length: 39
+0.00: Generated table for decimal length 12, num_digits: 2
+0.00: Generated table for decimal length 12, num_digits: 3
+0.00: Finished decimal length 12, binary length: 40
+0.00: Starting decimal length: 14
+0.00: Started decimal length 14, binary length: 44
+0.00: Started decimal length 14, binary length: 45
+0.00: 34141388314143
+0.00: Finished decimal length 14, binary length: 45
+0.00: Started decimal length 14, binary length: 46
+0.00: Finished decimal length 14, binary length: 44
+0.00: Started decimal length 14, binary length: 47
+0.01: Starting decimal length: 7
+0.01: Generated table for decimal length 14, num_digits: 3
+0.01: Generated table for decimal length 14, num_digits: 2
+0.01: Started decimal length 7, binary length: 20
+0.01: Finished decimal length 7, binary length: 20
+0.01: Started decimal length 7, binary length: 22
+0.01: 3129213
+0.01: Finished decimal length 7, binary length: 22
+0.01: Started decimal length 7, binary length: 23
+0.01: 5071705
+0.01: 5259525
+0.01: 5841485
+0.01: Finished decimal length 7, binary length: 23
+0.01: Started decimal length 7, binary length: 24
+0.01: Finished decimal length 7, binary length: 24
+0.01: Generated table for decimal length 7, num_digits: 2
+0.01: Started decimal length 7, binary length: 21
+0.01: 1758571
+0.01: 1934391
+0.01: 1979791
+0.01: Finished decimal length 7, binary length: 21
+0.01: Starting decimal length: 9
+0.01: Started decimal length 9, binary length: 27
+0.01: Finished decimal length 9, binary length: 27
+0.01: Started decimal length 9, binary length: 28
+0.01: Finished decimal length 9, binary length: 28
+0.01: Started decimal length 9, binary length: 29
+0.01: Started decimal length 9, binary length: 30
+0.01: Finished decimal length 9, binary length: 29
+0.01: Finished decimal length 14, binary length: 46
+0.01: Generated table for decimal length 9, num_digits: 2
+0.01: 719848917
+0.01: Finished decimal length 14, binary length: 47
+0.01: 910373019
+0.01: 939474939
+0.01: Generated table for decimal length 9, num_digits: 3
+0.01: Finished decimal length 9, binary length: 30
+0.01: Starting decimal length: 11
+0.01: Started decimal length 11, binary length: 34
+0.01: Generated table for decimal length 11, num_digits: 2
+0.01: Started decimal length 11, binary length: 35
+0.01: 10050905001
+0.01: Started decimal length 11, binary length: 36
+0.01: Generated table for decimal length 11, num_digits: 3
+0.01: Finished decimal length 11, binary length: 34
+0.01: Finished decimal length 11, binary length: 36
+0.01: Started decimal length 11, binary length: 37
+0.01: 18462126481
+0.01: 75015151057
+0.01: 32479297423
+0.01: Finished decimal length 11, binary length: 35
+0.01: Finished decimal length 11, binary length: 37
+0.01: Starting decimal length: 16
+0.01: Started decimal length 16, binary length: 50
+0.01: Started decimal length 16, binary length: 53
+0.01: Started decimal length 16, binary length: 51
+0.01: Generated table for decimal length 16, num_digits: 2
+0.01: Finished decimal length 16, binary length: 50
+0.01: Generated table for decimal length 16, num_digits: 3
+0.01: Started decimal length 16, binary length: 52
+0.01: 3148955775598413
+0.01: 1793770770773971
+0.01: Finished decimal length 16, binary length: 52
+0.01: Started decimal length 16, binary length: 54
+0.01: Finished decimal length 16, binary length: 51
+0.01: Finished decimal length 16, binary length: 53
+0.01: Starting decimal length: 13
+0.01: Started decimal length 13, binary length: 40
+0.01: Finished decimal length 13, binary length: 40
+0.01: Started decimal length 13, binary length: 41
+0.01: 1234104014321
+0.01: Generated table for decimal length 16, num_digits: 4
+0.01: Started decimal length 13, binary length: 42
+0.01: Finished decimal length 16, binary length: 54
+0.01: Started decimal length 13, binary length: 44
+0.01: 1413899983141
+0.01: Generated table for decimal length 13, num_digits: 2
+0.01: 1474922294741
+0.01: Generated table for decimal length 13, num_digits: 3
+0.01: Finished decimal length 13, binary length: 42
+0.01: 9484874784849
+0.01: Finished decimal length 13, binary length: 44
+0.01: Started decimal length 13, binary length: 43
+0.01: Starting decimal length: 18
+0.01: Started decimal length 18, binary length: 57
+0.01: 5652622262565
+0.01: 7227526257227
+0.01: 7284717174827
+0.01: Finished decimal length 13, binary length: 43
+0.01: Started decimal length 18, binary length: 58
+0.01: Generated table for decimal length 13, num_digits: 4
+0.01: Started decimal length 18, binary length: 59
+0.01: Started decimal length 18, binary length: 60
+0.01: Generated table for decimal length 18, num_digits: 2
+0.01: 313558153351855313
+0.01: Generated table for decimal length 18, num_digits: 3
+0.01: 161206152251602161
+0.01: 1792704072971
+0.01: 1794096904971
+0.01: 1999925299991
+0.01: Finished decimal length 13, binary length: 41
+0.01: Finished decimal length 18, binary length: 58
+0.01: Finished decimal length 18, binary length: 57
+0.01: Generated table for decimal length 18, num_digits: 4
+0.01: Finished decimal length 18, binary length: 59
+0.01: Finished decimal length 18, binary length: 60
+0.01: Starting decimal length: 15
+0.01: Starting decimal length: 20
+0.01: Started decimal length 15, binary length: 47
+0.01: Started decimal length 20, binary length: 64
+0.01: Started decimal length 20, binary length: 65
+0.01: Generated table for decimal length 20, num_digits: 2
+0.01: Started decimal length 20, binary length: 66
+0.01: Generated table for decimal length 20, num_digits: 3
+0.01: Started decimal length 20, binary length: 67
+0.01: Started decimal length 15, binary length: 48
+0.01: Started decimal length 15, binary length: 49
+0.01: 10879740244204797801
+0.01: Generated table for decimal length 20, num_digits: 4
+0.01: Finished decimal length 15, binary length: 47
+0.02: 32889941788714998823
+0.02: 94778157422475187749
+0.02: Finished decimal length 20, binary length: 65
+0.02: Finished decimal length 15, binary length: 48
+0.02: Started decimal length 15, binary length: 50
+0.02: Finished decimal length 20, binary length: 67
+0.02: Generated table for decimal length 15, num_digits: 2
+0.02: Finished decimal length 20, binary length: 64
+0.02: Generated table for decimal length 15, num_digits: 3
+0.02: 552212535212255
+0.02: Finished decimal length 15, binary length: 49
+0.02: 933138363831339
+0.02: Finished decimal length 15, binary length: 50
+0.02: Starting decimal length: 17
+0.02: Started decimal length 17, binary length: 54
+0.02: Started decimal length 17, binary length: 55
+0.02: Started decimal length 17, binary length: 56
+0.02: 18279440804497281
+0.02: 37078796869787073
+0.02: Started decimal length 17, binary length: 57
+0.02: 10457587478575401
+0.02: Finished decimal length 20, binary length: 66
+0.02: Generated table for decimal length 17, num_digits: 2
+0.02: Generated table for decimal length 17, num_digits: 3
+0.02: 10819671917691801
+0.02: 37629927072992673
+0.02: 34104482028440143
+0.02: Finished decimal length 17, binary length: 55
+0.02: Finished decimal length 17, binary length: 54
+0.02: Finished decimal length 17, binary length: 57
+0.02: 55952637073625955
+0.02: Finished decimal length 17, binary length: 56
+0.02: Starting decimal length: 22
+0.02: Started decimal length 22, binary length: 70
+0.02: Started decimal length 22, binary length: 72
+0.02: Started decimal length 22, binary length: 71
+0.02: Started decimal length 22, binary length: 73
+0.02: Started decimal length 22, binary length: 74
+0.02: Generated table for decimal length 22, num_digits: 2
+0.02: Generated table for decimal length 22, num_digits: 3
+0.03: Generated table for decimal length 22, num_digits: 4
+0.03: Finished decimal length 22, binary length: 70
+0.03: Finished decimal length 22, binary length: 74
+0.03: Starting decimal length: 19
+0.03: Started decimal length 19, binary length: 60
+0.03: Started decimal length 19, binary length: 61
+0.03: Finished decimal length 22, binary length: 72
+0.03: Finished decimal length 19, binary length: 60
+0.03: Started decimal length 19, binary length: 62
+0.03: Generated table for decimal length 22, num_digits: 5
+0.03: Finished decimal length 22, binary length: 71
+0.03: Started decimal length 19, binary length: 63
+0.03: Started decimal length 19, binary length: 64
+0.03: Generated table for decimal length 19, num_digits: 2
+0.03: Generated table for decimal length 19, num_digits: 3
+0.04: Generated table for decimal length 19, num_digits: 4
+0.04: 9674868723278684769
+0.04: Finished decimal length 19, binary length: 64
+0.04: Finished decimal length 22, binary length: 73
+0.04: Finished decimal length 19, binary length: 62
+0.04: 7036267126217626307
+0.04: Finished decimal length 19, binary length: 61
+0.04: Finished decimal length 19, binary length: 63
+0.04: Starting decimal length: 24
+0.04: Started decimal length 24, binary length: 77
+0.04: Started decimal length 24, binary length: 78
+0.04: Started decimal length 24, binary length: 79
+0.04: Started decimal length 24, binary length: 80
+0.04: Generated table for decimal length 24, num_digits: 2
+0.04: Generated table for decimal length 24, num_digits: 3
+0.04: Generated table for decimal length 24, num_digits: 4
+0.04: Starting decimal length: 21
+0.04: Started decimal length 21, binary length: 67
+0.05: Generated table for decimal length 24, num_digits: 5
+0.05: Started decimal length 21, binary length: 68
+0.05: Finished decimal length 24, binary length: 78
+0.05: Started decimal length 21, binary length: 69
+0.06: Finished decimal length 24, binary length: 80
+0.06: Started decimal length 21, binary length: 70
+0.06: Finished decimal length 24, binary length: 77
+0.06: Generated table for decimal length 21, num_digits: 2
+0.06: Generated table for decimal length 21, num_digits: 3
+0.06: Generated table for decimal length 21, num_digits: 4
+0.06: 114354126121621453411
+0.06: Finished decimal length 21, binary length: 68
+0.06: Finished decimal length 24, binary length: 79
+0.07: Finished decimal length 21, binary length: 67
+0.07: Finished decimal length 21, binary length: 70
+0.07: 539475328171823574935
+0.07: Generated table for decimal length 21, num_digits: 5
+0.07: Starting decimal length: 26
+0.07: Started decimal length 26, binary length: 84
+0.07: Started decimal length 26, binary length: 85
+0.07: Generated table for decimal length 26, num_digits: 2
+0.07: Generated table for decimal length 26, num_digits: 3
+0.07: Started decimal length 26, binary length: 87
+0.07: Started decimal length 26, binary length: 86
+0.07: Finished decimal length 21, binary length: 69
+0.08: Generated table for decimal length 26, num_digits: 5
+0.08: Generated table for decimal length 26, num_digits: 4
+0.09: 50824513851188115831542805
+0.10: Finished decimal length 26, binary length: 87
+0.10: Finished decimal length 26, binary length: 85
+0.10: Starting decimal length: 23
+0.10: Started decimal length 23, binary length: 74
+0.10: Started decimal length 23, binary length: 75
+0.10: Started decimal length 23, binary length: 76
+0.10: Started decimal length 23, binary length: 77
+0.11: Finished decimal length 26, binary length: 84
+0.11: Generated table for decimal length 23, num_digits: 2
+0.11: Generated table for decimal length 23, num_digits: 3
+0.11: Generated table for decimal length 23, num_digits: 4
+0.12: Generated table for decimal length 23, num_digits: 5
+0.12: Finished decimal length 23, binary length: 75
+0.12: 92913401775957710431929
+0.12: 94261805583838550816249
+0.13: 17461998948684989916471
+0.13: Finished decimal length 23, binary length: 74
+0.13: Finished decimal length 23, binary length: 77
+0.13: Finished decimal length 26, binary length: 86
+0.13: 72928088195859188082927
+0.13: Finished decimal length 23, binary length: 76
+0.13: Starting decimal length: 28
+0.13: Started decimal length 28, binary length: 90
+0.13: Started decimal length 28, binary length: 91
+0.13: Starting decimal length: 25
+0.13: Started decimal length 28, binary length: 92
+0.13: Started decimal length 25, binary length: 80
+0.13: Started decimal length 25, binary length: 81
+0.13: Started decimal length 28, binary length: 93
+0.13: Started decimal length 25, binary length: 82
+0.13: Started decimal length 25, binary length: 83
+0.13: Started decimal length 25, binary length: 84
+0.13: Started decimal length 28, binary length: 94
+0.13: Finished decimal length 28, binary length: 94
+0.13: Generated table for decimal length 25, num_digits: 2
+0.14: Generated table for decimal length 25, num_digits: 3
+0.14: Generated table for decimal length 28, num_digits: 2
+0.14: Generated table for decimal length 25, num_digits: 4
+0.14: Generated table for decimal length 28, num_digits: 3
+0.14: 1219228158701078518229121
+0.14: 1130486074817184706840311
+0.14: Generated table for decimal length 28, num_digits: 4
+0.14: Finished decimal length 25, binary length: 84
+0.15: Generated table for decimal length 28, num_digits: 5
+0.15: Generated table for decimal length 25, num_digits: 5
+0.15: 5812988563013103658892185
+0.15: 1194313761393931673134911
+0.16: Finished decimal length 25, binary length: 80
+0.16: 7260988688520258868890627
+0.16: Finished decimal length 25, binary length: 81
+0.17: 7475703079870789703075747
+0.17: Finished decimal length 25, binary length: 82
+0.18: Finished decimal length 28, binary length: 90
+0.19: Finished decimal length 25, binary length: 83
+0.19: Starting decimal length: 27
+0.19: Started decimal length 27, binary length: 87
+0.19: Started decimal length 27, binary length: 88
+0.19: Started decimal length 27, binary length: 89
+0.20: 1609061098335005338901609061
+0.21: Finished decimal length 28, binary length: 92
+0.21: Started decimal length 27, binary length: 90
+0.22: Generated table for decimal length 28, num_digits: 6
+0.22: Generated table for decimal length 27, num_digits: 2
+0.22: Generated table for decimal length 27, num_digits: 3
+0.22: Generated table for decimal length 27, num_digits: 4
+0.23: Generated table for decimal length 27, num_digits: 5
+0.25: Finished decimal length 28, binary length: 91
+0.25: 351095331428353824133590153
+0.27: 795280629691202196926082597
+0.28: Finished decimal length 27, binary length: 88
+0.28: 138758321383797383123857831
+0.28: 390714505091666190505417093
+0.29: Finished decimal length 27, binary length: 87
+0.30: Generated table for decimal length 27, num_digits: 6
+0.30: Finished decimal length 28, binary length: 93
+0.30: Starting decimal length: 30
+0.30: Started decimal length 30, binary length: 97
+0.30: Started decimal length 30, binary length: 98
+0.30: Started decimal length 30, binary length: 99
+0.30: Started decimal length 30, binary length: 100
+0.30: Generated table for decimal length 30, num_digits: 2
+0.30: Generated table for decimal length 30, num_digits: 3
+0.30: Generated table for decimal length 30, num_digits: 4
+0.30: 532079161251434152161970235
+0.31: Generated table for decimal length 30, num_digits: 5
+0.32: 552963956270141072659369255
+0.33: Finished decimal length 27, binary length: 90
+0.35: Finished decimal length 27, binary length: 89
+0.35: Starting decimal length: 29
+0.35: Started decimal length 29, binary length: 94
+0.35: Started decimal length 29, binary length: 95
+0.39: Generated table for decimal length 30, num_digits: 6
+0.39: Started decimal length 29, binary length: 96
+0.42: 30000258151173237115185200003
+0.43: Finished decimal length 30, binary length: 98
+0.43: Started decimal length 29, binary length: 97
+0.44: 378059787464677776464787950873
+0.51: Finished decimal length 30, binary length: 97
+0.51: Generated table for decimal length 29, num_digits: 2
+0.51: Generated table for decimal length 29, num_digits: 3
+0.51: Generated table for decimal length 29, num_digits: 4
+0.52: Generated table for decimal length 29, num_digits: 5
+0.55: 30658464822225352222846485603
+0.59: Generated table for decimal length 29, num_digits: 6
+0.66: Finished decimal length 30, binary length: 100
+0.68: 56532345659072227095654323565
+0.71: Finished decimal length 30, binary length: 99
+0.72: Finished decimal length 29, binary length: 97
+0.75: 17869806142184248124160896871
+0.76: Finished decimal length 29, binary length: 95
+0.79: 19756291244127372144219265791
+0.79: Finished decimal length 29, binary length: 94
+0.91: Finished decimal length 29, binary length: 96
+0.92: Starting decimal length: 32
+0.92: Started decimal length 32, binary length: 104
+0.92: Started decimal length 32, binary length: 105
+0.92: Started decimal length 32, binary length: 103
+0.92: Generated table for decimal length 32, num_digits: 2
+0.92: Finished decimal length 32, binary length: 103
+0.92: Generated table for decimal length 32, num_digits: 3
+0.92: Started decimal length 32, binary length: 106
+0.92: Started decimal length 32, binary length: 107
+0.92: Starting decimal length: 31
+0.92: Started decimal length 31, binary length: 100
+0.92: Generated table for decimal length 32, num_digits: 4
+0.92: Generated table for decimal length 32, num_digits: 5
+0.92: Started decimal length 31, binary length: 101
+0.99: Generated table for decimal length 32, num_digits: 6
+0.99: Started decimal length 31, binary length: 102
+1.36: Finished decimal length 32, binary length: 107
+1.36: Started decimal length 31, binary length: 103
+1.55: Finished decimal length 32, binary length: 105
+1.55: Generated table for decimal length 31, num_digits: 2
+1.55: Generated table for decimal length 31, num_digits: 3
+1.55: Generated table for decimal length 31, num_digits: 4
+1.55: Generated table for decimal length 31, num_digits: 5
+1.62: 1115792035060833380605302975111
+1.62: Generated table for decimal length 31, num_digits: 6
+1.70: Generated table for decimal length 32, num_digits: 7
+1.77: 3390741646331381831336461470933
+1.80: Finished decimal length 31, binary length: 100
+1.85: Finished decimal length 32, binary length: 104
+1.94: Finished decimal length 32, binary length: 106
+1.94: Starting decimal length: 34
+1.94: Started decimal length 34, binary length: 110
+1.94: Started decimal length 34, binary length: 111
+1.94: Started decimal length 34, binary length: 112
+1.94: Started decimal length 34, binary length: 113
+2.02: 7155681676104835384016761865517
+2.14: Finished decimal length 31, binary length: 102
+2.14: Generated table for decimal length 34, num_digits: 2
+2.14: Generated table for decimal length 34, num_digits: 3
+2.14: Generated table for decimal length 34, num_digits: 4
+2.15: Generated table for decimal length 34, num_digits: 5
+2.21: Generated table for decimal length 34, num_digits: 6
+2.22: Finished decimal length 31, binary length: 101
+2.26: 1409460884147943003497414880649041
+2.43: Generated table for decimal length 31, num_digits: 7
+2.53: 1480869563960100770010693659680841
+2.72: Finished decimal length 34, binary length: 110
+2.98: Generated table for decimal length 34, num_digits: 7
+3.02: Finished decimal length 31, binary length: 103
+3.03: Starting decimal length: 33
+3.03: Started decimal length 33, binary length: 107
+3.03: Started decimal length 33, binary length: 109
+3.03: Generated table for decimal length 33, num_digits: 2
+3.03: Started decimal length 33, binary length: 108
+3.03: Started decimal length 33, binary length: 110
+3.03: Generated table for decimal length 33, num_digits: 3
+3.03: Generated table for decimal length 33, num_digits: 4
+3.04: Generated table for decimal length 33, num_digits: 5
+3.11: Generated table for decimal length 33, num_digits: 6
+3.21: 332997156422555464555224651799233
+3.74: Finished decimal length 34, binary length: 111
+3.79: 188726493036450333054630394627881
+3.95: Generated table for decimal length 33, num_digits: 7
+4.26: Finished decimal length 34, binary length: 112
+4.50: Finished decimal length 33, binary length: 108
+4.87: Finished decimal length 33, binary length: 107
+5.53: 579782100975917393719579001287975
+5.84: Finished decimal length 33, binary length: 110
+5.85: Finished decimal length 33, binary length: 109
+5.86: Starting decimal length: 35
+5.86: Started decimal length 35, binary length: 113
+5.86: Finished decimal length 35, binary length: 113
+5.86: Started decimal length 35, binary length: 114
+5.86: Started decimal length 35, binary length: 115
+5.86: Started decimal length 35, binary length: 116
+5.86: Started decimal length 35, binary length: 117
+5.86: Generated table for decimal length 35, num_digits: 3
+5.86: Generated table for decimal length 35, num_digits: 2
+5.86: Generated table for decimal length 35, num_digits: 4
+5.87: Generated table for decimal length 35, num_digits: 5
+5.94: Generated table for decimal length 35, num_digits: 6
+6.26: 10652099006552766666725560099025601
+6.31: 9932525402284695775964822045252399
+6.55: 10827628430039640604693003482672801
+6.71: Finished decimal length 34, binary length: 113
+6.74: Generated table for decimal length 35, num_digits: 7
+7.97: 94285848717805140304150871784858249
+8.20: 54074940541725088788052714504947045
+8.97: 96754720977532710701723577902745769
+9.91: Finished decimal length 35, binary length: 117
+9.91: Starting decimal length: 36
+9.91: Started decimal length 36, binary length: 117
+9.91: Started decimal length 36, binary length: 118
+9.91: Started decimal length 36, binary length: 119
+9.91: Generated table for decimal length 36, num_digits: 2
+9.91: Generated table for decimal length 36, num_digits: 3
+9.91: Started decimal length 36, binary length: 120
+9.92: Generated table for decimal length 36, num_digits: 4
+9.92: Generated table for decimal length 36, num_digits: 5
+9.99: Generated table for decimal length 36, num_digits: 6
+10.00: 710084230446469950059964644032480017
+10.79: Generated table for decimal length 36, num_digits: 7
+10.87: Finished decimal length 35, binary length: 115
+13.21: Finished decimal length 35, binary length: 114
+13.71: 139124355701640720027046107553421931
+14.07: Generated table for decimal length 35, num_digits: 8
+14.31: Finished decimal length 36, binary length: 118
+14.34: 794397832642722540045227246238793497
+15.47: Finished decimal length 36, binary length: 117
+15.72: 76759778311938325452383911387795767
+17.19: Finished decimal length 35, binary length: 116
+17.23: Starting decimal length: 37
+17.24: Started decimal length 37, binary length: 120
+17.24: Started decimal length 37, binary length: 121
+17.24: Generated table for decimal length 37, num_digits: 3
+17.24: Started decimal length 37, binary length: 123
+17.24: Generated table for decimal length 37, num_digits: 2
+17.24: Generated table for decimal length 37, num_digits: 4
+17.24: Generated table for decimal length 37, num_digits: 5
+17.24: Started decimal length 37, binary length: 122
+17.30: Generated table for decimal length 37, num_digits: 6
+18.05: Generated table for decimal length 37, num_digits: 7
+18.96: Generated table for decimal length 36, num_digits: 8
+19.65: 998021119318189842248981813911120899
+19.83: Finished decimal length 36, binary length: 120
+20.31: Finished decimal length 36, binary length: 119
+24.40: 1323475457008895965695988007545743231
+24.83: 1681824725831390428240931385274281861
+25.00: Finished decimal length 37, binary length: 120
+25.08: Generated table for decimal length 37, num_digits: 8
+25.61: 5893890080115984244424895110800983985
+29.30: Finished decimal length 37, binary length: 121
+37.11: Finished decimal length 37, binary length: 122
+45.77: 9707999142717984907094897172419997079
+49.67: 9970387454991896491946981994547830799
+50.69: Finished decimal length 37, binary length: 123
+50.72: Starting decimal length: 38
+50.72: Started decimal length 38, binary length: 123
+50.72: Finished decimal length 38, binary length: 123
+50.72: Started decimal length 38, binary length: 124
+50.72: Started decimal length 38, binary length: 125
+50.72: Started decimal length 38, binary length: 127
+50.72: Started decimal length 38, binary length: 126
+50.72: Generated table for decimal length 38, num_digits: 2
+50.72: Generated table for decimal length 38, num_digits: 3
+50.72: Generated table for decimal length 38, num_digits: 4
+50.73: Generated table for decimal length 38, num_digits: 5
+50.79: Generated table for decimal length 38, num_digits: 6
+51.42: Generated table for decimal length 38, num_digits: 7
+54.65: 32190158233101105022050110133285109123
+58.10: Generated table for decimal length 38, num_digits: 8
+58.12: Starting decimal length: 39
+58.12: Started decimal length 39, binary length: 127
+58.12: Started decimal length 39, binary length: 128
+58.12: Started decimal length 39, binary length: 129
+58.12: Generated table for decimal length 39, num_digits: 2
+58.12: Started decimal length 39, binary length: 130
+58.12: Generated table for decimal length 39, num_digits: 3
+58.12: Generated table for decimal length 39, num_digits: 4
+58.12: Generated table for decimal length 39, num_digits: 5
+58.18: Generated table for decimal length 39, num_digits: 6
+58.98: Generated table for decimal length 39, num_digits: 7
+63.10: Finished decimal length 38, binary length: 127
+67.67: Generated table for decimal length 39, num_digits: 8
+69.83: Finished decimal length 38, binary length: 125
+72.08: Finished decimal length 38, binary length: 124
+80.00: 122240824002234545959545432200428042221
+82.08: Finished decimal length 38, binary length: 126
+82.18: Starting decimal length: 40
+82.18: Started decimal length 40, binary length: 130
+82.18: Started decimal length 40, binary length: 131
+82.18: Started decimal length 40, binary length: 132
+82.18: Started decimal length 40, binary length: 133
+82.18: Generated table for decimal length 40, num_digits: 2
+82.18: Generated table for decimal length 40, num_digits: 3
+82.18: Generated table for decimal length 40, num_digits: 4
+82.19: Generated table for decimal length 40, num_digits: 5
+82.26: Generated table for decimal length 40, num_digits: 6
+82.75: 124192421350471300727003174053124291421
+83.06: Generated table for decimal length 40, num_digits: 7
+85.04: 1017421766189445102992015449816671247101
+89.45: 773609618198307097595790703891816906377
+91.63: Generated table for decimal length 40, num_digits: 8
+91.73: 131674457014330218696812033410754476131
+98.84: Finished decimal length 39, binary length: 128
+101.67: 1634587141488515712882175158841417854361
+110.27: 7114907950920173924554293710290597094117
+118.61: Finished decimal length 40, binary length: 130
+125.02: Finished decimal length 39, binary length: 127
+125.74: Finished decimal length 40, binary length: 131
+128.74: 551700061998405245575542504899160007155
+151.03: Generated table for decimal length 39, num_digits: 9
+151.69: Finished decimal length 39, binary length: 130
+161.45: Finished decimal length 39, binary length: 129
+161.72: Starting decimal length: 41
+161.72: Started decimal length 41, binary length: 133
+161.72: Finished decimal length 41, binary length: 133
+161.72: Started decimal length 41, binary length: 134
+161.72: Started decimal length 41, binary length: 135
+161.72: Started decimal length 41, binary length: 136
+161.72: Started decimal length 41, binary length: 137
+161.72: Generated table for decimal length 41, num_digits: 2
+161.72: Generated table for decimal length 41, num_digits: 3
+161.72: Generated table for decimal length 41, num_digits: 4
+161.73: Generated table for decimal length 41, num_digits: 5
+161.78: Generated table for decimal length 41, num_digits: 6
+162.51: Generated table for decimal length 41, num_digits: 7
+169.01: Finished decimal length 40, binary length: 132
+169.83: Generated table for decimal length 41, num_digits: 8
+179.84: Generated table for decimal length 40, num_digits: 9
+188.79: 31636759764024794204540249742046795763613
+211.68: Finished decimal length 40, binary length: 133
+223.89: 14327425216354951264146215945361252472341
+242.92: Generated table for decimal length 41, num_digits: 9
+256.62: 56545858306667087923432978076660385854565
+263.23: 98801466348600079992129997000684366410889
+267.15: Finished decimal length 41, binary length: 137
+267.39: Starting decimal length: 42
+267.39: Started decimal length 42, binary length: 137
+267.39: Started decimal length 42, binary length: 138
+267.39: Generated table for decimal length 42, num_digits: 2
+267.39: Started decimal length 42, binary length: 139
+267.39: Generated table for decimal length 42, num_digits: 3
+267.39: Started decimal length 42, binary length: 140
+267.39: Generated table for decimal length 42, num_digits: 4
+267.40: Generated table for decimal length 42, num_digits: 5
+267.47: Generated table for decimal length 42, num_digits: 6
+268.19: Generated table for decimal length 42, num_digits: 7
+275.48: Generated table for decimal length 42, num_digits: 8
+293.76: 38090421176450233778487733205467112409083
+331.27: Finished decimal length 41, binary length: 135
+348.59: Generated table for decimal length 42, num_digits: 9
+350.56: 309612431907274418544445814472709134216903
+375.65: 128795669673344381770077183443376966597821
+383.35: Finished decimal length 41, binary length: 134
+389.82: 905357630732463833436634338364237036753509
+416.42: 139035351443367699760067996763344153530931
+418.73: Finished decimal length 42, binary length: 138
+439.34: Finished decimal length 41, binary length: 136
+439.64: Starting decimal length: 43
+439.64: Started decimal length 43, binary length: 140
+439.64: Started decimal length 43, binary length: 141
+439.64: Generated table for decimal length 43, num_digits: 2
+439.64: Started decimal length 43, binary length: 143
+439.64: Started decimal length 43, binary length: 142
+439.64: Generated table for decimal length 43, num_digits: 3
+439.64: Generated table for decimal length 43, num_digits: 4
+439.65: Generated table for decimal length 43, num_digits: 5
+439.72: Generated table for decimal length 43, num_digits: 6
+440.45: Generated table for decimal length 43, num_digits: 7
+447.78: Generated table for decimal length 43, num_digits: 8
+486.04: 170341815153453197154451791354351518143071
+487.89: Finished decimal length 42, binary length: 140
+492.78: 595943598626320807905509708023626895349595
+505.59: Finished decimal length 42, binary length: 139
+506.41: Finished decimal length 42, binary length: 137
+506.62: Starting decimal length: 44
+506.62: Started decimal length 44, binary length: 143
+506.62: Started decimal length 44, binary length: 144
+506.62: Started decimal length 44, binary length: 145
+506.62: Started decimal length 44, binary length: 146
+506.62: Started decimal length 44, binary length: 147
+521.61: Generated table for decimal length 43, num_digits: 9
+521.61: Generated table for decimal length 44, num_digits: 2
+521.61: Generated table for decimal length 44, num_digits: 3
+521.61: Generated table for decimal length 44, num_digits: 4
+521.62: Generated table for decimal length 44, num_digits: 5
+521.68: Generated table for decimal length 44, num_digits: 6
+522.49: Generated table for decimal length 44, num_digits: 7
+531.18: Generated table for decimal length 44, num_digits: 8
+545.90: Finished decimal length 44, binary length: 143
+608.00: 3381578420704603001613161003064070248751833
+619.61: Generated table for decimal length 44, num_digits: 9
+688.77: 1816060344791285708869688075821974430606181
+696.73: 7342779513978827245484845427288793159772437
+786.79: Finished decimal length 43, binary length: 141
+806.85: Finished decimal length 43, binary length: 140
+843.83: Finished decimal length 44, binary length: 147

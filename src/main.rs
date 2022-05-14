@@ -90,7 +90,7 @@ impl LevelTable {
         suffixes.sort_unstable();
 
         instance.log_expanded_size = suffixes.len().bits();
-        let expanded_size = 1 << suffixes.len().bits();
+        let expanded_size = 1 << instance.log_expanded_size;
 
         instance.suffixes.reserve(expanded_size + 64);
 
@@ -128,13 +128,11 @@ impl LevelTable {
         let mask = (1u64.wrapping_shl(known_bits) - 1).reverse_bits();
         let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
 
-        let guess_index = usize::min(
-            (lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize,
-            self.suffixes.len() - 1,
-        );
+        let guess_index = (lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize;
 
-        self.suffixes[guess_index..]
+        self.suffixes
             .iter()
+            .skip(guess_index)
             .find(|&s| s & mask >= lookup_bits)
             .map_or(false, |s| s & mask == lookup_bits)
     }
@@ -212,7 +210,7 @@ fn find_palindrome_recursive(
 
             let reversed = new_num.reverse_bits() >> leading_zeros;
             if reversed == new_num {
-                println!("{:.2}: {}", start_time.elapsed().as_secs_f32(), new_num);
+                println!("{:.4}: {}", start_time.elapsed().as_secs_f32(), new_num);
             }
         }
 
@@ -287,21 +285,21 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
         let cancel = AtomicBool::new(false);
         let finished_count = AtomicU32::new(0);
 
-        // let pool = rayon::ThreadPoolBuilder::new()
-        //     .num_threads(usize::max(
-        //         rayon::current_num_threads(),
-        //         (max_bin_length - min_bin_length + 2) as usize,
-        //     ))
-        //     .build()
-        //     .unwrap();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(usize::max(
+                rayon::current_num_threads(),
+                (max_bin_length - min_bin_length + 2) as usize,
+            ))
+            .build()
+            .unwrap();
 
         println!(
-            "{:.2}: Starting decimal length: {}",
+            "{:.4}: Starting decimal length: {}",
             start_time.elapsed().as_secs_f32(),
             dec_length
         );
 
-        rayon::scope_fifo(|scope| {
+        pool.scope_fifo(|scope| {
             for bin_length in min_bin_length..=max_bin_length {
                 let digit_cache_ref = &digit_cache;
                 let max_dec_cache_ref = &max_dec_cache;
@@ -310,7 +308,7 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                 let cancel_ref = &cancel;
                 scope.spawn_fifo(move |_| {
                     println!(
-                        "{:.2}: Started decimal length {}, binary length: {}",
+                        "{:.4}: Started decimal length {}, binary length: {}",
                         start_time.elapsed().as_secs_f32(),
                         dec_length,
                         bin_length
@@ -329,7 +327,7 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                         cancel_ref.store(true, Ordering::Relaxed);
                     }
                     println!(
-                        "{:.2}: Finished decimal length {}, binary length: {}",
+                        "{:.4}: Finished decimal length {}, binary length: {}",
                         start_time.elapsed().as_secs_f32(),
                         dec_length,
                         bin_length
@@ -337,14 +335,14 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                 });
             }
 
-            for num_digits in 2..10 {
+            for num_digits in 2..9 {
                 let digit_cache_ref = &digit_cache;
                 let cancel_ref = &cancel;
                 let lookup_table_ref = &lookup_table;
                 scope.spawn_fifo(move |_| {
                     if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
                         println!(
-                            "{:.2}: Generated table for decimal length {}, num_digits: {}",
+                            "{:.4}: Generated table for decimal length {}, num_digits: {}",
                             start_time.elapsed().as_secs_f32(),
                             dec_length,
                             num_digits
@@ -353,7 +351,7 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                 })
             }
         });
-        dec_length += 2;
+        dec_length += 1;
     }
 }
 
@@ -381,13 +379,13 @@ fn get_digit_cache(dec_length: u32) -> Vec<u256> {
 
 fn main() {
     let start_time = Instant::now();
-    let dec_length = 50;
+    let dec_length = 1;
     rayon::scope_fifo(|scope| {
         scope.spawn_fifo(|_| {
             find_palindrome(dec_length, start_time);
         });
-        scope.spawn_fifo(|_| {
-            find_palindrome(dec_length + 1, start_time);
-        });
+        // scope.spawn_fifo(|_| {
+        //     find_palindrome(dec_length + 1, start_time);
+        // });
     });
 }

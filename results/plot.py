@@ -1,5 +1,5 @@
-import sys
 import matplotlib.pyplot as plt
+import matplotlib.offsetbox
 import numpy as np
 from scipy.optimize import curve_fit
 
@@ -31,6 +31,7 @@ def get_file_data(i, file_path, n):
     times = times[first_index:last_index]
     palindromes = palindromes[first_index:last_index]
     color = ["green", "blue", "red", "purple", "teal", "brown"][i]
+    labels = ["Naive", "Mirror", "Tree Search", "Range Pruning", "Range+Table Pruning", "Range+Table Pruning - Rust"]
 
     popt, _ = curve_fit(linear_law, np.log(times), np.log(palindromes))
     a, b = popt[0], np.exp(popt[1])
@@ -40,34 +41,42 @@ def get_file_data(i, file_path, n):
     days = hours / 24.0
     years = days / 365.0
     months = years * 12.0
-    print("%.2f hours = %.2f days = %.2f months = %.2g years" % (hours, days, months, years))
+    print("%.2f hours = %.2f days = %.2f months = %.2f years" % (hours, days, months, years))
 
     x = np.arange(1, 600, 1)
     plt.loglog(x, power_law(x, a, b), '--', color=color)
-    plt.loglog(times, palindromes, '.', color=color)
+    plt.loglog(times, palindromes, '.', color=color, label=labels[i])
     exp10 = np.round(np.log10(b))
-    text_y = power_law(600, a, b)
-    if n >= 3 and (i == 1 or i == 2):
-        correction = (i - 1.5) * 5
-        text_y = np.exp(np.log(text_y) + correction)
-    plt.text(650, text_y, "$p=10^{\,%d} \\times t^{\,%.2f}$"%(exp10, a), color=color, fontsize=12)
-    plt.subplots_adjust(right=0.75)
+    if n >= 3 and i == 1:
+        va = 'top'
+    elif n >= 3 and i == 2:
+        va = 'bottom'
+    else:
+        va = 'center'
+
+    plt.text(650, power_law(600, a, b), "$p=10^{%d} \\times t^{\,%.2f}$"%(exp10, a), va=va, color=color, fontsize=12)
+    plt.subplots_adjust(right=0.77)
 
     return (times, palindromes)
 
 def main(result_paths):
-    for i, path in enumerate(result_paths):
-        times, palindromes = get_file_data(i, path, len(result_paths))
+    for n in range(1, len(result_paths) + 1):
+        for i, path in list(enumerate(result_paths[:n]))[::-1]:
+            times, palindromes = get_file_data(i, path, n)
 
-    plt.xlim(1, 600)
-    plt.ylim(1, plt.ylim()[1])
-    plt.xlabel("Time (s)", fontsize=12)
-    plt.ylabel("Palindrome", fontsize=12)
-    plt.title("Time to find palindromes", fontsize=12)
-    plt.show()
+        plt.xlim(1, 600)
+        plt.ylim(1, plt.ylim()[1])
+        plt.xlabel("Time (s)", fontsize=12)
+        plt.ylabel("Palindrome", fontsize=12)
+        plt.title("Time to find palindromes", fontsize=12)
+        legend = plt.legend(loc='lower right', ncol=2) # loc='center left',bbox_to_anchor=(1, 0)
+
+        plt.savefig('%d.png' % n)
+        plt.clf()
+    # plt.show()
 
 
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main(["naive.txt", "mirror.txt", "tree_search.txt", "pruned_ranges.txt", "pruned_table.txt", "rust.txt"])

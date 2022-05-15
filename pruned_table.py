@@ -33,11 +33,12 @@ def is_in_table(subtraction_suffix, shared_bits_length, lookup_table):
 
 def is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table):
     nonshared_bits_length = (max_decimal_palindrome ^ min_decimal_palindrome).bit_length()
-    shared_bit_prefix = bin(min_decimal_palindrome >> nonshared_bits_length)[2:]
-    hypothetical_suffix = int(shared_bit_prefix[::-1], 2)
-    subtraction_suffix = (hypothetical_suffix - min_decimal_palindrome) % (1 << len(shared_bit_prefix))
+    shared_most_significant_bits = bin(min_decimal_palindrome >> nonshared_bits_length)[2:]
+    hypothetical_least_significant_bits = int(shared_most_significant_bits[::-1], 2)
+    subtraction_result = hypothetical_least_significant_bits - min_decimal_palindrome
+    subtraction_least_significant_bits = subtraction_result % (1 << len(shared_most_significant_bits))
 
-    return not is_in_table(subtraction_suffix, len(shared_bit_prefix), lookup_table)
+    return not is_in_table(subtraction_least_significant_bits, len(shared_most_significant_bits), lookup_table)
 
 def is_pruned(decimal_digits, decimal_length, lookup_table_array):
     changing_decimal_length = decimal_length - 2 * len(decimal_digits)
@@ -114,6 +115,7 @@ def create_table_array(decimal_length, max_table_digits):
     return table_array
 
 def main():
+    # Blatant cheating, created using pruned_profile.py
     best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6]
     decimal_length = 1
     while True:

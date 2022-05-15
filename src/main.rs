@@ -28,6 +28,8 @@ impl Bits for usize {
     }
 }
 
+// Taken from Paul Khuong https://github.com/appnexus/acf/blob/master/src/an_itoa.c#L93
+// See: https://pvk.ca/Blog/2017/12/22/appnexus-common-framework-its-out-also-how-to-print-integers-faster/
 fn encode_ten_thousands(hi: u64, lo: u64) -> u64 {
     let merged: u64 = hi | (lo << 32);
     let top = ((merged * 10486u64) >> 20) & ((0x7Fu64 << 32) | 0x7Fu64);
@@ -293,11 +295,11 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
             .build()
             .unwrap();
 
-        println!(
-            "{:.4}: Starting decimal length: {}",
-            start_time.elapsed().as_secs_f32(),
-            dec_length
-        );
+        // println!(
+        //     "{:.4}: Starting decimal length: {}",
+        //     start_time.elapsed().as_secs_f32(),
+        //     dec_length
+        // );
 
         pool.scope_fifo(|scope| {
             for bin_length in min_bin_length..=max_bin_length {
@@ -307,12 +309,12 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                 let finished_count_ref = &finished_count;
                 let cancel_ref = &cancel;
                 scope.spawn_fifo(move |_| {
-                    println!(
-                        "{:.4}: Started decimal length {}, binary length: {}",
-                        start_time.elapsed().as_secs_f32(),
-                        dec_length,
-                        bin_length
-                    );
+                    // println!(
+                    //     "{:.4}: Started decimal length {}, binary length: {}",
+                    //     start_time.elapsed().as_secs_f32(),
+                    //     dec_length,
+                    //     bin_length
+                    // );
                     find_palindrome_internal(
                         dec_length,
                         bin_length,
@@ -326,12 +328,12 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                     {
                         cancel_ref.store(true, Ordering::Relaxed);
                     }
-                    println!(
-                        "{:.4}: Finished decimal length {}, binary length: {}",
-                        start_time.elapsed().as_secs_f32(),
-                        dec_length,
-                        bin_length
-                    );
+                    // println!(
+                    //     "{:.4}: Finished decimal length {}, binary length: {}",
+                    //     start_time.elapsed().as_secs_f32(),
+                    //     dec_length,
+                    //     bin_length
+                    // );
                 });
             }
 
@@ -341,12 +343,12 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                 let lookup_table_ref = &lookup_table;
                 scope.spawn_fifo(move |_| {
                     if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
-                        println!(
-                            "{:.4}: Generated table for decimal length {}, num_digits: {}",
-                            start_time.elapsed().as_secs_f32(),
-                            dec_length,
-                            num_digits
-                        );
+                        // println!(
+                        //     "{:.4}: Generated table for decimal length {}, num_digits: {}",
+                        //     start_time.elapsed().as_secs_f32(),
+                        //     dec_length,
+                        //     num_digits
+                        // );
                     }
                 })
             }
@@ -380,12 +382,5 @@ fn get_digit_cache(dec_length: u32) -> Vec<u256> {
 fn main() {
     let start_time = Instant::now();
     let dec_length = 1;
-    rayon::scope_fifo(|scope| {
-        scope.spawn_fifo(|_| {
-            find_palindrome(dec_length, start_time);
-        });
-        // scope.spawn_fifo(|_| {
-        //     find_palindrome(dec_length + 1, start_time);
-        // });
-    });
+    find_palindrome(dec_length, start_time);
 }

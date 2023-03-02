@@ -2,9 +2,10 @@
 use ethnum::u256;
 use once_cell::sync::OnceCell;
 use std::{
-    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     time::Instant,
 };
+use sysinfo::{RefreshKind, SystemExt};
 
 trait Bits {
     fn bits(&self) -> u32;
@@ -189,18 +190,19 @@ impl LookupTable {
     }
 }
 
-fn find_palindrome_recursive(
+fn find_palindrome_recursive<'scope>(
     current_num: u256,
     bin_num: u256,
     level: u32,
     digits: impl Iterator<Item = u32>,
     dec_length: u32,
     bin_length: u32,
-    digit_cache: &[u256],
-    max_dec_cache: &[u256],
-    max_bin_cache: &[u256],
-    lookup_table: &LookupTable,
+    digit_cache: &'scope [u256],
+    max_dec_cache: &'scope [u256],
+    max_bin_cache: &'scope [u256],
+    lookup_table: &'scope LookupTable,
     start_time: Instant,
+    capped_scope: &CappedScope<'scope, '_>,
 ) {
     if (level + 1) * 2 >= dec_length {
         for digit in digits {
@@ -236,31 +238,35 @@ fn find_palindrome_recursive(
             continue;
         }
 
-        find_palindrome_recursive(
-            new_num,
-            new_bin_num,
-            level + 1,
-            0..10,
-            dec_length,
-            bin_length,
-            digit_cache,
-            max_dec_cache,
-            max_bin_cache,
-            lookup_table,
-            start_time,
-        );
+        capped_scope.spawn_fifo(move |capped_scope| {
+            find_palindrome_recursive(
+                new_num,
+                new_bin_num,
+                level + 1,
+                0..10,
+                dec_length,
+                bin_length,
+                digit_cache,
+                max_dec_cache,
+                max_bin_cache,
+                lookup_table,
+                start_time,
+                capped_scope,
+            );
+        });
     }
 }
 
-fn find_palindrome_internal(
+fn find_palindrome_internal<'scope>(
     dec_length: u32,
     bin_length: u32,
-    digit_cache: &[u256],
-    max_dec_cache: &[u256],
-    lookup_table: &LookupTable,
+    digit_cache: &'scope [u256],
+    max_dec_cache: &'scope [u256],
+    max_bin_cache: &'scope [u256],
+    lookup_table: &'scope LookupTable,
     start_time: Instant,
+    capped_scope: &CappedScope<'scope, '_>,
 ) {
-    let max_bin_cache = get_max_cache(bin_length, 2);
     find_palindrome_recursive(
         u256::ZERO,
         u256::ZERO,
@@ -270,9 +276,10 @@ fn find_palindrome_internal(
         bin_length,
         digit_cache,
         max_dec_cache,
-        &max_bin_cache,
+        max_bin_cache,
         lookup_table,
         start_time,
+        capped_scope,
     );
 }
 
@@ -301,14 +308,45 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
         //     dec_length
         // );
 
+        let max_bin_caches: Vec<_> = (min_bin_length..=max_bin_length)
+            .map(|bin_length| get_max_cache(bin_length, 2))
+            .collect();
+
+        let current_tasks = AtomicUsize::new(0);
         pool.scope_fifo(|scope| {
+            let capped_scope = CappedScope {
+                underlying_scope: scope,
+                current_tasks: &current_tasks,
+                max_tasks: pool.current_num_threads(),
+            };
+            let available_memory =
+                sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())
+                    .available_memory();
+            let max_cache_digits = (available_memory / std::mem::size_of::<u64>() as u64).ilog10();
+            for num_digits in 2..=max_cache_digits {
+                let digit_cache_ref = &digit_cache;
+                let cancel_ref = &cancel;
+                let lookup_table_ref = &lookup_table;
+                capped_scope.force_spawn_fifo(move |_| {
+                    if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
+                        // println!(
+                        //     "{:.4}: Generated table for decimal length {}, num_digits: {}",
+                        //     start_time.elapsed().as_secs_f32(),
+                        //     dec_length,
+                        //     num_digits
+                        // );
+                    }
+                })
+            }
+
             for bin_length in min_bin_length..=max_bin_length {
                 let digit_cache_ref = &digit_cache;
                 let max_dec_cache_ref = &max_dec_cache;
                 let lookup_table_ref = &lookup_table;
                 let finished_count_ref = &finished_count;
                 let cancel_ref = &cancel;
-                scope.spawn_fifo(move |_| {
+                let max_bin_cache_ref = &max_bin_caches[(bin_length - min_bin_length) as usize];
+                capped_scope.spawn_fifo(move |capped_scope| {
                     // println!(
                     //     "{:.4}: Started decimal length {}, binary length: {}",
                     //     start_time.elapsed().as_secs_f32(),
@@ -320,8 +358,10 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                         bin_length,
                         digit_cache_ref,
                         max_dec_cache_ref,
+                        max_bin_cache_ref,
                         lookup_table_ref,
                         start_time,
+                        capped_scope,
                     );
                     if finished_count_ref.fetch_add(1, Ordering::Release)
                         == (max_bin_length - min_bin_length)
@@ -335,22 +375,6 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                     //     bin_length
                     // );
                 });
-            }
-
-            for num_digits in 2..9 {
-                let digit_cache_ref = &digit_cache;
-                let cancel_ref = &cancel;
-                let lookup_table_ref = &lookup_table;
-                scope.spawn_fifo(move |_| {
-                    if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
-                        // println!(
-                        //     "{:.4}: Generated table for decimal length {}, num_digits: {}",
-                        //     start_time.elapsed().as_secs_f32(),
-                        //     dec_length,
-                        //     num_digits
-                        // );
-                    }
-                })
             }
         });
         dec_length += 1;
@@ -383,4 +407,40 @@ fn main() {
     let start_time = Instant::now();
     let dec_length = 1;
     find_palindrome(dec_length, start_time);
+}
+
+struct CappedScope<'scope, 'a> {
+    underlying_scope: &'a rayon::ScopeFifo<'scope>,
+    current_tasks: &'scope AtomicUsize,
+    max_tasks: usize,
+}
+
+impl<'scope, 'a> CappedScope<'scope, 'a> {
+    pub fn spawn_fifo<BODY>(&self, body: BODY)
+    where
+        BODY: FnOnce(&CappedScope<'scope, '_>) + Send + 'scope,
+    {
+        if self.current_tasks.load(Ordering::Relaxed) < self.max_tasks {
+            self.force_spawn_fifo(body);
+            return;
+        }
+        body(self);
+    }
+
+    pub fn force_spawn_fifo<BODY>(&self, body: BODY)
+    where
+        BODY: FnOnce(&CappedScope<'scope, '_>) + Send + 'scope,
+    {
+        self.current_tasks.fetch_add(1, Ordering::Relaxed);
+        let max_tasks = self.max_tasks;
+        let current_tasks = self.current_tasks;
+        self.underlying_scope.spawn_fifo(move |s2| {
+            body(&CappedScope {
+                underlying_scope: s2,
+                current_tasks,
+                max_tasks,
+            });
+            current_tasks.fetch_sub(1, Ordering::Relaxed);
+        });
+    }
 }

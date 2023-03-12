@@ -1,8 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 use ethnum::u256;
 use once_cell::sync::OnceCell;
+use serde::{Serialize, Deserialize};
 use std::{
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Mutex},
     time::Instant,
 };
 use sysinfo::{RefreshKind, SystemExt};
@@ -266,15 +267,16 @@ impl LookupTable {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct State {
     current_num: u256,
     bin_num: u256,
     is_odd: Option<bool>,
-    level: u32
+    level: u32,
 }
 
 fn find_palindrome_recursive<'scope>(
-    state: State,
+    mut stack: Vec<State>,
     dec_length: u32,
     bin_length: u32,
     digit_cache: &'scope [[u256; 10]],
@@ -283,10 +285,15 @@ fn find_palindrome_recursive<'scope>(
     lookup_table: &'scope LookupTable,
     start_time: Instant,
     capped_scope: &CappedScope<'scope, '_>,
+    save_state: &'scope Mutex<SaveState>,
 ) {
-    let mut stack = vec![state];
+    loop {
+        if TERMINATE.load(Ordering::Relaxed) {
+            save_state.lock().unwrap().tasks.push(SaveTask { bin_length, stack });
+            return;
+        }
+        let Some(state) = stack.pop() else { return };
 
-    while let Some(state) = stack.pop() {
         let current_num = state.current_num;
         let bin_num = state.bin_num;
         let level = state.level;
@@ -308,6 +315,7 @@ fn find_palindrome_recursive<'scope>(
                 let reversed = new_num.reverse_bits() >> leading_zeros;
                 if reversed == new_num {
                     println!("{:.4}: {}", start_time.elapsed().as_secs_f32(), new_num);
+                    save_state.lock().unwrap().palindromes_found.push(new_num);
                 }
             }
 
@@ -340,9 +348,14 @@ fn find_palindrome_recursive<'scope>(
                 Some(*(new_num >> (level + 1)).low() as u64 & 1 != wanted_digit)
             };
 
-            if !capped_scope.spawn_fifo(move |capped_scope| {
+            let did_spawn = capped_scope.spawn_fifo(move |capped_scope| {
                 find_palindrome_recursive(
-                    State { current_num: new_num, bin_num: new_bin_num, is_odd, level: level + 1 },
+                    vec![State {
+                        current_num: new_num,
+                        bin_num: new_bin_num,
+                        is_odd,
+                        level: level + 1,
+                    }],
                     dec_length,
                     bin_length,
                     digit_cache,
@@ -351,40 +364,25 @@ fn find_palindrome_recursive<'scope>(
                     lookup_table,
                     start_time,
                     capped_scope,
+                    save_state
                 );
-            }) {
-                stack.push(State { current_num: new_num, bin_num: new_bin_num, is_odd, level: level + 1 });
+            });
+
+            if !did_spawn {
+                stack.push(State {
+                    current_num: new_num,
+                    bin_num: new_bin_num,
+                    is_odd,
+                    level: level + 1,
+                });
             }
         }
     }
 }
 
-fn find_palindrome_internal<'scope>(
-    dec_length: u32,
-    bin_length: u32,
-    digit_cache: &'scope [[u256; 10]],
-    max_dec_cache: &'scope [u256],
-    max_bin_cache: &'scope [u256],
-    lookup_table: &'scope LookupTable,
-    start_time: Instant,
-    capped_scope: &CappedScope<'scope, '_>,
-) {
-    find_palindrome_recursive(
-        State { current_num: u256::ZERO, bin_num: u256::ZERO, is_odd: Some(true), level: 0 },
-        dec_length,
-        bin_length,
-        digit_cache,
-        max_dec_cache,
-        max_bin_cache,
-        lookup_table,
-        start_time,
-        capped_scope,
-    );
-}
-
-fn find_palindrome(starting_length: u32, start_time: Instant) {
-    let mut dec_length = starting_length;
+fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
     loop {
+        let dec_length = save_state.lock().unwrap().dec_length;
         let max_bin_length = (u256::from(10u32).pow(dec_length) - 1).bits();
         let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
         let digit_cache = get_digit_cache(dec_length);
@@ -444,19 +442,27 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                     max_tasks: 8192,
                 };
 
-                for bin_length in min_bin_length..=max_bin_length {
+                let existing_tasks = &mut save_state.lock().unwrap().tasks;
+                let tasks: Vec<SaveTask> = if existing_tasks.is_empty() {
+                    (min_bin_length..=max_bin_length).map(|bin_length| SaveTask { stack: vec![State {
+                        current_num: u256::ZERO,
+                        bin_num: u256::ZERO,
+                        is_odd: Some(true),
+                        level: 0,
+                    }], bin_length }).collect()
+                } else {
+                    existing_tasks.drain(..).collect()
+                };
+
+                for task in tasks {
+                    let bin_length = task.bin_length;
                     let digit_cache_ref = &digit_cache;
                     let max_dec_cache_ref = &max_dec_cache;
                     let lookup_table_ref = &lookup_table;
                     let max_bin_cache_ref = &max_bin_caches[(bin_length - min_bin_length) as usize];
                     capped_scope.spawn_fifo(move |capped_scope| {
-                        // println!(
-                        //     "{:.4}: Started decimal length {}, binary length: {}",
-                        //     start_time.elapsed().as_secs_f32(),
-                        //     dec_length,
-                        //     bin_length
-                        // );
-                        find_palindrome_internal(
+                        find_palindrome_recursive(
+                            task.stack,
                             dec_length,
                             bin_length,
                             digit_cache_ref,
@@ -465,6 +471,7 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
                             lookup_table_ref,
                             start_time,
                             capped_scope,
+                            save_state
                         );
                     });
                 }
@@ -476,7 +483,12 @@ fn find_palindrome(starting_length: u32, start_time: Instant) {
             // );
             cancel.store(true, Ordering::Relaxed);
         });
-        dec_length += 1;
+
+        if save_state.lock().unwrap().tasks.is_empty() {
+            save_state.lock().unwrap().dec_length += 1;
+        } else {
+            return;
+        }
     }
 }
 
@@ -502,11 +514,37 @@ fn get_digit_cache(dec_length: u32) -> Vec<[u256; 10]> {
         .collect()
 }
 
+static TERMINATE: AtomicBool = AtomicBool::new(false);
+
+#[derive(Serialize, Deserialize)]
+struct SaveTask {
+    bin_length: u32,
+    stack: Vec<State>
+}
+
+#[derive(Serialize, Deserialize)]
+struct SaveState {
+    dec_length: u32,
+    tasks: Vec<SaveTask>,
+    palindromes_found: Vec<u256>,
+}
+
 fn main() {
+    let save_path_arg = std::env::args().skip(1).next();
+    let mut save_state = Mutex::new(SaveState { dec_length: 1, tasks: vec![], palindromes_found: vec![] });
+    if let Some(save_path) = &save_path_arg {
+        let load_result = std::fs::read_to_string(&save_path);
+        if let Ok(contents) = load_result {
+            *save_state.get_mut().unwrap() = serde_json::from_str(&contents).unwrap()
+        }
+
+        ctrlc::set_handler(move || TERMINATE.store(true, Ordering::Relaxed))
+            .expect("Error setting Ctrl-C handler");
+    }
     let start_time = Instant::now();
-    let dec_length = 1;
-    find_palindrome(dec_length, start_time);
-    // let digit_cache = get_digit_cache(50);
-    // let cancel = AtomicBool::new(false);
-    // let table = LevelTable::new(8, &digit_cache, &cancel);
+    find_palindrome(&save_state, start_time);
+    if let Some(save_path) = &save_path_arg {
+        let serialized_save_state = serde_json::to_string(&*save_state.lock().unwrap()).unwrap();
+        std::fs::write(save_path, serialized_save_state).unwrap();
+    }
 }

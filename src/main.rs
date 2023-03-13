@@ -1,5 +1,6 @@
-#![allow(clippy::too_many_arguments)]
-use ethnum::u256;
+#![allow(clippy::too_many_arguments, non_camel_case_types)]
+// use ethnum::u256;
+use zkp_u256::{U256, Pow};
 use once_cell::sync::OnceCell;
 use serde::{Serialize, Deserialize};
 use std::{
@@ -9,6 +10,8 @@ use std::{
 use sysinfo::{RefreshKind, SystemExt};
 
 mod sort;
+
+type u256 = U256;
 
 struct CappedScope<'scope, 'a> {
     underlying_scope: &'a rayon::ScopeFifo<'scope>,
@@ -48,25 +51,40 @@ impl<'scope, 'a> CappedScope<'scope, 'a> {
     }
 }
 
+trait Rev {
+    fn reverse_bits(&self) -> Self;
+}
+
+impl Rev for u256 {
+    fn reverse_bits(&self) -> Self {
+        let limbs = self.as_limbs().map(|l| l.reverse_bits());
+
+        Self::from_limbs([limbs[3], limbs[2], limbs[1], limbs[0]])
+    }
+}
+
 trait Bits {
     fn bits(&self) -> u32;
 }
 
 impl Bits for u256 {
     fn bits(&self) -> u32 {
-        Self::BITS - self.leading_zeros()
+        use zkp_u256::Binary;
+        256 - self.leading_zeros() as u32
     }
 }
 
 impl Bits for u64 {
     fn bits(&self) -> u32 {
-        Self::BITS - self.leading_zeros()
+        use zkp_u256::Binary;
+        Self::BITS - self.leading_zeros() as u32
     }
 }
 
 impl Bits for usize {
     fn bits(&self) -> u32 {
-        Self::BITS - self.leading_zeros()
+        use zkp_u256::Binary;
+        Self::BITS - self.leading_zeros() as u32
     }
 }
 
@@ -83,7 +101,7 @@ fn get_digit_cache_64(digit_cache: &[[u256; 10]], level: usize) -> Vec<[u64; 10]
     digit_cache
         .iter()
         .skip(level)
-        .map(|c| c.map(|n| *(n >> level).low() as u64))
+        .map(|c| c.clone().map(|n| (n >> level).limb(0)))
         .collect()
 }
 
@@ -191,12 +209,12 @@ impl LevelTable {
         }
         let known_bits = u32::min(known_bits, 64);
 
-        let current_bits = *(current_num >> level).low() as u64;
+        let current_bits = (current_num.clone() >> level as usize).limb(0);
         let shift = bin_length as i32 - level as i32 - 64;
         let final_bits = (if shift > 0 {
-            *(current_num >> shift).low() as u64
+            (current_num >> shift as usize).limb(0)
         } else {
-            (*current_num.low() as u64) << -shift
+            current_num.limb(0) << -shift
         })
         .reverse_bits();
 
@@ -249,7 +267,7 @@ impl LookupTable {
     }
 
     fn lookup(&self, current_num: u256, max_dec: u256, level: u32, bin_length: u32) -> bool {
-        let msb_set_bits = (bin_length as i32) - ((max_dec ^ current_num).bits() as i32);
+        let msb_set_bits = (bin_length as i32) - ((max_dec ^ current_num.clone()).bits() as i32);
         if (level as i32) > msb_set_bits {
             return true;
         }
@@ -294,8 +312,8 @@ fn find_palindrome_recursive<'scope>(
         }
         let Some(state) = stack.pop() else { return };
 
-        let current_num = state.current_num;
-        let bin_num = state.bin_num;
+        let current_num = &state.current_num;
+        let bin_num = &state.bin_num;
         let level = state.level;
 
         let digits = match state.is_odd {
@@ -306,15 +324,16 @@ fn find_palindrome_recursive<'scope>(
 
         if (state.level + 1) * 2 >= dec_length {
             for digit in digits {
-                let new_num = state.current_num + digit_cache[level as usize][digit as usize];
-                let leading_zeros = new_num.leading_zeros();
-                if leading_zeros + bin_length != u256::BITS {
+                let new_num = state.current_num.clone() + digit_cache[level as usize][digit as usize].clone();
+                use zkp_u256::Binary;
+                let leading_zeros = new_num.leading_zeros() as u32;
+                if leading_zeros + bin_length != 256 {
                     continue;
                 }
 
-                let reversed = new_num.reverse_bits() >> leading_zeros;
+                let reversed = new_num.reverse_bits() >> leading_zeros as usize;
                 if reversed == new_num {
-                    println!("{:.4}: {}", start_time.elapsed().as_secs_f32(), new_num);
+                    println!("{:.4}: {}", start_time.elapsed().as_secs_f32(), new_num.to_decimal_string());
                     save_state.lock().unwrap().palindromes_found.push(new_num);
                 }
             }
@@ -322,37 +341,40 @@ fn find_palindrome_recursive<'scope>(
             continue;
         }
 
-        let max_bin_add = max_bin_cache[level as usize];
-        let max_dec_add = max_dec_cache[level as usize];
+        let max_bin_add = max_bin_cache[level as usize].clone();
+        let max_dec_add = max_dec_cache[level as usize].clone();
 
         for digit in digits {
-            let new_num = current_num + digit_cache[level as usize][digit as usize];
-            let new_bin_num = bin_num + (((new_num >> level) & 1) << (bin_length - level - 1));
+            let new_num = current_num + digit_cache[level as usize][digit as usize].clone();
+            let new_bin_num = bin_num + (((new_num.clone() >> level as usize ) & u256::ONE) << (bin_length - level - 1) as usize);
 
-            let new_max_dec = new_num + max_dec_add;
+            let new_max_dec = new_num.clone() + max_dec_add.clone();
 
-            if new_bin_num + max_bin_add < new_num || new_max_dec < new_bin_num {
+            if new_bin_num.clone() + max_bin_add.clone() < new_num.clone() || new_max_dec < new_bin_num.clone() {
                 continue;
             }
 
-            if !lookup_table.lookup(new_num, new_max_dec, level + 1, bin_length) {
+            if !lookup_table.lookup(new_num.clone(), new_max_dec.clone(), level + 1, bin_length) {
                 continue;
             }
 
-            let msb_set_bits = (bin_length as i32) - ((new_max_dec ^ new_num).bits() as i32);
+            let msb_set_bits = (bin_length as i32) - ((new_max_dec.clone() ^ new_num.clone()).bits() as i32);
 
             let is_odd = if msb_set_bits <= (level as i32 + 1) {
                 None
             } else {
-                let wanted_digit = *(new_max_dec >> (bin_length - level - 2)).low() as u64 & 1;
-                Some(*(new_num >> (level + 1)).low() as u64 & 1 != wanted_digit)
+                let wanted_digit = (new_max_dec >> (bin_length - level - 2) as usize).limb(0) & 1;
+                Some((new_num.clone() >> (level + 1) as usize).limb(0) & 1 != wanted_digit)
             };
+
+            let copy = new_num.clone();
+            let bin_copy = new_bin_num.clone();
 
             let did_spawn = capped_scope.spawn_fifo(move |capped_scope| {
                 find_palindrome_recursive(
                     vec![State {
-                        current_num: new_num,
-                        bin_num: new_bin_num,
+                        current_num: copy,
+                        bin_num: bin_copy,
                         is_odd,
                         level: level + 1,
                     }],
@@ -383,8 +405,8 @@ fn find_palindrome_recursive<'scope>(
 fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
     loop {
         let dec_length = save_state.lock().unwrap().dec_length;
-        let max_bin_length = (u256::from(10u32).pow(dec_length) - 1).bits();
-        let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
+        let max_bin_length = (u256::from(10u32).pow(dec_length as u64) - u256::ONE).bits();
+        let min_bin_length = (u256::from(10u32).pow((dec_length - 1) as u64) + u256::ONE).bits();
         let digit_cache = get_digit_cache(dec_length);
         let max_dec_cache = get_max_cache(dec_length, 10);
         let lookup_table = LookupTable::new(&digit_cache);
@@ -495,7 +517,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
 fn get_max_cache(length: u32, base: u32) -> Vec<u256> {
     let cache_length = (length + 1) / 2;
     (1..cache_length)
-        .map(|i| u256::from(base).pow(length - i) - u256::from(base).pow(i))
+        .map(|i| u256::from(base).pow((length - i) as u64) - u256::from(base).pow(i as u64))
         .collect()
 }
 
@@ -504,12 +526,12 @@ fn get_digit_cache(dec_length: u32) -> Vec<[u256; 10]> {
     (0..cache_length)
         .map(|i| {
             let j = dec_length - i - 1;
-            let mut entry = u256::from(10u32).pow(i);
+            let mut entry = u256::from(10u32).pow(i as u64);
             if i != j {
-                entry += u256::from(10u32).pow(j);
+                entry += u256::from(10u32).pow(j as u64);
             }
 
-            std::array::from_fn(|i| entry * i as u128)
+            std::array::from_fn(|i| entry.clone() * u256::from(i))
         })
         .collect()
 }

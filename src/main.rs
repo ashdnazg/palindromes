@@ -1,9 +1,11 @@
 #![allow(clippy::too_many_arguments)]
 use ethnum::u256;
-use once_cell::sync::OnceCell;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::{
-    sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Mutex, OnceLock,
+    },
     time::Instant,
 };
 use sysinfo::{RefreshKind, SystemExt};
@@ -74,7 +76,6 @@ impl Bits for usize {
 struct LevelTable {
     // sorted vector of reversed suffixes of the sum of the digits after this level.
     suffixes: Vec<u64>,
-    min_known_bits: u32,
     log_expanded_size: u32,
 }
 
@@ -87,67 +88,66 @@ fn get_digit_cache_64(digit_cache: &[[u256; 10]], level: usize) -> Vec<[u64; 10]
         .collect()
 }
 
-#[inline(never)]
-fn explode(instance: &mut LevelTable, sub_cache_size: u64, cancel_marker: &AtomicBool) {
-    let mut i = (sub_cache_size - 1) as usize;
-    while i > 0 {
-        if cancel_marker.load(Ordering::Relaxed) {
-            return;
-        }
-
-        let mut suffix = instance.suffixes[i];
-        let mut wanted_index = (suffix >> (u64::BITS - instance.log_expanded_size)) as usize;
-        loop {
-            let current_contents = instance.suffixes[wanted_index];
-            if current_contents <= suffix {
-                break;
-            }
-            instance.suffixes[wanted_index] = suffix;
-            suffix = current_contents;
-            wanted_index += 1;
-        }
-
-        i -= 1;
+impl LevelTable {
+    fn wanted_index(&self, suffix: u64) -> usize {
+        (suffix >> (u64::BITS - self.log_expanded_size)) as usize
     }
-}
 
-#[inline(never)]
-fn populate(
-    instance: &mut LevelTable,
-    digit_cache_64: &Vec<[u64; 10]>,
-    cancel_marker: &AtomicBool,
-) {
-    let mut stack: Vec<(usize, u64)> = std::iter::repeat((0, 0))
-        .take(digit_cache_64.len() + 1)
-        .collect();
-    loop {
-        if cancel_marker.load(Ordering::Relaxed) {
-            return;
-        }
-        let sum = stack[1].1 + digit_cache_64[0][stack[0].0];
-        instance.suffixes.push(sum.reverse_bits());
-
-        let mut plus_idx = 0;
-        loop {
-            if stack[plus_idx].0 < 9 {
-                stack[plus_idx].0 += 1;
-                break;
-            }
-            if plus_idx == digit_cache_64.len() - 1 {
+    fn explode(&mut self, sub_cache_size: u64, cancel_marker: &AtomicBool) {
+        let mut i = (sub_cache_size - 1) as usize;
+        while i > 0 {
+            if cancel_marker.load(Ordering::Relaxed) {
                 return;
             }
-            stack[plus_idx].0 = 0;
-            plus_idx += 1;
-        }
 
-        while plus_idx > 0 {
-            stack[plus_idx].1 = stack[plus_idx + 1].1 + digit_cache_64[plus_idx][stack[plus_idx].0];
-            plus_idx -= 1;
+            let mut suffix = self.suffixes[i];
+            let mut wanted_index = self.wanted_index(suffix);
+            loop {
+                let current_contents = self.suffixes[wanted_index];
+                if current_contents <= suffix {
+                    break;
+                }
+                self.suffixes[wanted_index] = suffix;
+                suffix = current_contents;
+                wanted_index += 1;
+            }
+
+            i -= 1;
         }
     }
-}
 
-impl LevelTable {
+    fn populate(&mut self, digit_cache_64: &Vec<[u64; 10]>, cancel_marker: &AtomicBool) {
+        let mut stack: Vec<(usize, u64)> = std::iter::repeat((0, 0))
+            .take(digit_cache_64.len() + 1)
+            .collect();
+        loop {
+            if cancel_marker.load(Ordering::Relaxed) {
+                return;
+            }
+            let sum = stack[1].1 + digit_cache_64[0][stack[0].0];
+            self.suffixes.push(sum.reverse_bits());
+
+            let mut plus_idx = 0;
+            loop {
+                if stack[plus_idx].0 < 9 {
+                    stack[plus_idx].0 += 1;
+                    break;
+                }
+                if plus_idx == digit_cache_64.len() - 1 {
+                    return;
+                }
+                stack[plus_idx].0 = 0;
+                plus_idx += 1;
+            }
+
+            while plus_idx > 0 {
+                stack[plus_idx].1 =
+                    stack[plus_idx + 1].1 + digit_cache_64[plus_idx][stack[plus_idx].0];
+                plus_idx -= 1;
+            }
+        }
+    }
+
     fn new(
         num_digits: u32,
         digit_cache: &[[u256; 10]],
@@ -156,7 +156,6 @@ impl LevelTable {
         let sub_cache_size = 10u64.pow(num_digits);
         let mut instance = Self {
             suffixes: Vec::with_capacity(sub_cache_size.next_power_of_two() as usize + 64),
-            min_known_bits: 10u64.pow(num_digits).bits(),
             log_expanded_size: sub_cache_size.bits(),
         };
 
@@ -168,7 +167,7 @@ impl LevelTable {
 
         let digit_cache_64 = get_digit_cache_64(digit_cache, level as usize);
 
-        populate(&mut instance, &digit_cache_64, cancel_marker);
+        instance.populate(&digit_cache_64, cancel_marker);
 
         if cancel_marker.load(Ordering::Relaxed) {
             return None;
@@ -180,13 +179,13 @@ impl LevelTable {
             *instance.suffixes.last().unwrap(),
         );
 
-        explode(&mut instance, sub_cache_size, cancel_marker);
+        instance.explode(sub_cache_size, cancel_marker);
 
         Some(instance)
     }
 
     fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
-        if known_bits < self.min_known_bits {
+        if known_bits < self.log_expanded_size {
             return true;
         }
         let known_bits = u32::min(known_bits, 64);
@@ -203,7 +202,7 @@ impl LevelTable {
         let mask = (1u64.wrapping_shl(known_bits) - 1).reverse_bits();
         let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
 
-        let guess_index = (lookup_bits >> (u64::BITS - self.log_expanded_size)) as usize;
+        let guess_index = self.wanted_index(lookup_bits);
 
         self.suffixes
             .iter()
@@ -216,13 +215,13 @@ impl LevelTable {
 #[derive(Clone, Debug)]
 struct LookupTable {
     // index is the recursion level.
-    sub_caches: Vec<OnceCell<LevelTable>>,
+    sub_caches: Vec<OnceLock<LevelTable>>,
 }
 
 impl LookupTable {
     fn new(digit_cache: &[[u256; 10]]) -> Self {
         Self {
-            sub_caches: vec![OnceCell::new(); digit_cache.len()],
+            sub_caches: vec![OnceLock::new(); digit_cache.len()],
         }
     }
 
@@ -289,7 +288,11 @@ fn find_palindrome_recursive<'scope>(
 ) {
     loop {
         if TERMINATE.load(Ordering::Relaxed) {
-            save_state.lock().unwrap().tasks.push(SaveTask { bin_length, stack });
+            save_state
+                .lock()
+                .unwrap()
+                .tasks
+                .push(SaveTask { bin_length, stack });
             return;
         }
         let Some(state) = stack.pop() else { return };
@@ -364,7 +367,7 @@ fn find_palindrome_recursive<'scope>(
                     lookup_table,
                     start_time,
                     capped_scope,
-                    save_state
+                    save_state,
                 );
             });
 
@@ -444,12 +447,17 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
 
                 let existing_tasks = &mut save_state.lock().unwrap().tasks;
                 let tasks: Vec<SaveTask> = if existing_tasks.is_empty() {
-                    (min_bin_length..=max_bin_length).map(|bin_length| SaveTask { stack: vec![State {
-                        current_num: u256::ZERO,
-                        bin_num: u256::ZERO,
-                        is_odd: Some(true),
-                        level: 0,
-                    }], bin_length }).collect()
+                    (min_bin_length..=max_bin_length)
+                        .map(|bin_length| SaveTask {
+                            stack: vec![State {
+                                current_num: u256::ZERO,
+                                bin_num: u256::ZERO,
+                                is_odd: Some(true),
+                                level: 0,
+                            }],
+                            bin_length,
+                        })
+                        .collect()
                 } else {
                     existing_tasks.drain(..).collect()
                 };
@@ -471,7 +479,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
                             lookup_table_ref,
                             start_time,
                             capped_scope,
-                            save_state
+                            save_state,
                         );
                     });
                 }
@@ -519,7 +527,7 @@ static TERMINATE: AtomicBool = AtomicBool::new(false);
 #[derive(Serialize, Deserialize)]
 struct SaveTask {
     bin_length: u32,
-    stack: Vec<State>
+    stack: Vec<State>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -531,7 +539,11 @@ struct SaveState {
 
 fn main() {
     let save_path_arg = std::env::args().skip(1).next();
-    let mut save_state = Mutex::new(SaveState { dec_length: 1, tasks: vec![], palindromes_found: vec![] });
+    let mut save_state = Mutex::new(SaveState {
+        dec_length: 1,
+        tasks: vec![],
+        palindromes_found: vec![],
+    });
     if let Some(save_path) = &save_path_arg {
         let load_result = std::fs::read_to_string(&save_path);
         if let Ok(contents) = load_result {

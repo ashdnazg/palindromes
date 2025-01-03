@@ -1,56 +1,23 @@
 #![allow(clippy::too_many_arguments)]
 use ethnum::u256;
+use rayon::Scope;
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Mutex, OnceLock,
+        atomic::{AtomicBool, Ordering},
+        Mutex,
     },
     time::Instant,
 };
 use sysinfo::{RefreshKind, SystemExt};
 
-mod sort;
+mod par_bitmap_table;
 
-struct CappedScope<'scope, 'a> {
-    underlying_scope: &'a rayon::ScopeFifo<'scope>,
-    current_tasks: &'scope AtomicUsize,
-    max_tasks: usize,
-}
+use par_bitmap_table::{LevelTable, LookupTable};
 
-impl<'scope, 'a> CappedScope<'scope, 'a> {
-    pub fn spawn_fifo<BODY>(&self, body: BODY) -> bool
-    where
-        BODY: FnOnce(&CappedScope<'scope, '_>) + Send + 'scope,
-    {
-        if self.current_tasks.load(Ordering::Relaxed) < self.max_tasks {
-            self.force_spawn_fifo(body);
+const VERBOSE: bool = false;
 
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn force_spawn_fifo<BODY>(&self, body: BODY)
-    where
-        BODY: FnOnce(&CappedScope<'scope, '_>) + Send + 'scope,
-    {
-        self.current_tasks.fetch_add(1, Ordering::Relaxed);
-        let max_tasks = self.max_tasks;
-        let current_tasks = self.current_tasks;
-        self.underlying_scope.spawn_fifo(move |s2| {
-            body(&CappedScope {
-                underlying_scope: s2,
-                current_tasks,
-                max_tasks,
-            });
-            current_tasks.fetch_sub(1, Ordering::Relaxed);
-        });
-    }
-}
-
-trait Bits {
+pub trait Bits {
     fn bits(&self) -> u32;
 }
 
@@ -72,200 +39,6 @@ impl Bits for usize {
     }
 }
 
-#[derive(Clone, Debug)]
-struct LevelTable {
-    // sorted vector of reversed suffixes of the sum of the digits after this level.
-    suffixes: Vec<u64>,
-    log_expanded_size: u32,
-}
-
-#[inline(never)]
-fn get_digit_cache_64(digit_cache: &[[u256; 10]], level: usize) -> Vec<[u64; 10]> {
-    digit_cache
-        .iter()
-        .skip(level)
-        .map(|c| c.map(|n| *(n >> level).low() as u64))
-        .collect()
-}
-
-impl LevelTable {
-    fn wanted_index(&self, suffix: u64) -> usize {
-        (suffix >> (u64::BITS - self.log_expanded_size)) as usize
-    }
-
-    fn explode(&mut self, sub_cache_size: u64, cancel_marker: &AtomicBool) {
-        let mut i = (sub_cache_size - 1) as usize;
-        while i > 0 {
-            if cancel_marker.load(Ordering::Relaxed) {
-                return;
-            }
-
-            let mut suffix = self.suffixes[i];
-            let mut wanted_index = self.wanted_index(suffix);
-            loop {
-                let current_contents = self.suffixes[wanted_index];
-                if current_contents <= suffix {
-                    break;
-                }
-                self.suffixes[wanted_index] = suffix;
-                suffix = current_contents;
-                wanted_index += 1;
-            }
-
-            i -= 1;
-        }
-    }
-
-    fn populate(&mut self, digit_cache_64: &Vec<[u64; 10]>, cancel_marker: &AtomicBool) {
-        let mut stack: Vec<(usize, u64)> = std::iter::repeat((0, 0))
-            .take(digit_cache_64.len() + 1)
-            .collect();
-        loop {
-            if cancel_marker.load(Ordering::Relaxed) {
-                return;
-            }
-            let sum = stack[1].1 + digit_cache_64[0][stack[0].0];
-            self.suffixes.push(sum.reverse_bits());
-
-            let mut plus_idx = 0;
-            loop {
-                if stack[plus_idx].0 < 9 {
-                    stack[plus_idx].0 += 1;
-                    break;
-                }
-                if plus_idx == digit_cache_64.len() - 1 {
-                    return;
-                }
-                stack[plus_idx].0 = 0;
-                plus_idx += 1;
-            }
-
-            while plus_idx > 0 {
-                stack[plus_idx].1 =
-                    stack[plus_idx + 1].1 + digit_cache_64[plus_idx][stack[plus_idx].0];
-                plus_idx -= 1;
-            }
-        }
-    }
-
-    fn new(
-        num_digits: u32,
-        digit_cache: &[[u256; 10]],
-        cancel_marker: &AtomicBool,
-    ) -> Option<Self> {
-        let sub_cache_size = 10u64.pow(num_digits);
-        let mut instance = Self {
-            suffixes: Vec::with_capacity(sub_cache_size.next_power_of_two() as usize + 64),
-            log_expanded_size: sub_cache_size.bits(),
-        };
-
-        let level = digit_cache.len() as u32 - num_digits;
-
-        if cancel_marker.load(Ordering::Relaxed) {
-            return None;
-        }
-
-        let digit_cache_64 = get_digit_cache_64(digit_cache, level as usize);
-
-        instance.populate(&digit_cache_64, cancel_marker);
-
-        if cancel_marker.load(Ordering::Relaxed) {
-            return None;
-        }
-
-        sort::quicksort(&mut instance.suffixes, u64::lt, cancel_marker);
-        instance.suffixes.resize(
-            instance.suffixes.capacity(),
-            *instance.suffixes.last().unwrap(),
-        );
-
-        instance.explode(sub_cache_size, cancel_marker);
-
-        Some(instance)
-    }
-
-    fn lookup(&self, current_num: u256, level: u32, known_bits: u32, bin_length: u32) -> bool {
-        if known_bits < self.log_expanded_size {
-            return true;
-        }
-        let known_bits = u32::min(known_bits, 64);
-
-        let current_bits = *(current_num >> level).low() as u64;
-        let shift = bin_length as i32 - level as i32 - 64;
-        let final_bits = (if shift > 0 {
-            *(current_num >> shift).low() as u64
-        } else {
-            (*current_num.low() as u64) << -shift
-        })
-        .reverse_bits();
-
-        let mask = (1u64.wrapping_shl(known_bits) - 1).reverse_bits();
-        let lookup_bits = final_bits.wrapping_sub(current_bits).reverse_bits() & mask;
-
-        let guess_index = self.wanted_index(lookup_bits);
-
-        self.suffixes
-            .iter()
-            .skip(guess_index)
-            .find(|&s| s & mask >= lookup_bits)
-            .map_or(false, |s| s & mask == lookup_bits)
-    }
-}
-
-#[derive(Clone, Debug)]
-struct LookupTable {
-    // index is the recursion level.
-    sub_caches: Vec<OnceLock<LevelTable>>,
-}
-
-impl LookupTable {
-    fn new(digit_cache: &[[u256; 10]]) -> Self {
-        Self {
-            sub_caches: vec![OnceLock::new(); digit_cache.len()],
-        }
-    }
-
-    fn generate(
-        &self,
-        num_digits: u32,
-        digit_cache: &[[u256; 10]],
-        cancel_marker: &AtomicBool,
-    ) -> bool {
-        if num_digits as usize > digit_cache.len() {
-            return false;
-        }
-
-        if cancel_marker.load(Ordering::Relaxed) {
-            return false;
-        }
-
-        let level = digit_cache.len() - num_digits as usize;
-        if let Some(level_table) = LevelTable::new(num_digits, digit_cache, cancel_marker) {
-            self.sub_caches[level].set(level_table).unwrap();
-        }
-
-        !cancel_marker.load(Ordering::Relaxed)
-    }
-
-    fn lookup(&self, current_num: u256, max_dec: u256, level: u32, bin_length: u32) -> bool {
-        let msb_set_bits = (bin_length as i32) - ((max_dec ^ current_num).bits() as i32);
-        if (level as i32) > msb_set_bits {
-            return true;
-        }
-
-        self.sub_caches[level as usize]
-            .get()
-            .map_or(true, |level_table| {
-                level_table.lookup(
-                    current_num,
-                    level,
-                    (msb_set_bits as u32) - level,
-                    bin_length,
-                )
-            })
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct State {
     current_num: u256,
@@ -283,7 +56,7 @@ fn find_palindrome_recursive<'scope>(
     max_bin_cache: &'scope [u256],
     lookup_table: &'scope LookupTable,
     start_time: Instant,
-    capped_scope: &CappedScope<'scope, '_>,
+    scope: &Scope<'scope>,
     save_state: &'scope Mutex<SaveState>,
 ) {
     loop {
@@ -338,11 +111,11 @@ fn find_palindrome_recursive<'scope>(
                 continue;
             }
 
-            if !lookup_table.lookup(new_num, new_max_dec, level + 1, bin_length) {
+            let msb_set_bits = (bin_length as i32) - ((new_max_dec ^ new_num).bits() as i32);
+
+            if !lookup_table.lookup(new_num, msb_set_bits, level + 1, bin_length) {
                 continue;
             }
-
-            let msb_set_bits = (bin_length as i32) - ((new_max_dec ^ new_num).bits() as i32);
 
             let is_odd = if msb_set_bits <= (level as i32 + 1) {
                 None
@@ -351,27 +124,27 @@ fn find_palindrome_recursive<'scope>(
                 Some(*(new_num >> (level + 1)).low() as u64 & 1 != wanted_digit)
             };
 
-            let did_spawn = capped_scope.spawn_fifo(move |capped_scope| {
-                find_palindrome_recursive(
-                    vec![State {
-                        current_num: new_num,
-                        bin_num: new_bin_num,
-                        is_odd,
-                        level: level + 1,
-                    }],
-                    dec_length,
-                    bin_length,
-                    digit_cache,
-                    max_dec_cache,
-                    max_bin_cache,
-                    lookup_table,
-                    start_time,
-                    capped_scope,
-                    save_state,
-                );
-            });
-
-            if !did_spawn {
+            if level < 4 {
+                scope.spawn(move |scope| {
+                    find_palindrome_recursive(
+                        vec![State {
+                            current_num: new_num,
+                            bin_num: new_bin_num,
+                            is_odd,
+                            level: level + 1,
+                        }],
+                        dec_length,
+                        bin_length,
+                        digit_cache,
+                        max_dec_cache,
+                        max_bin_cache,
+                        lookup_table,
+                        start_time,
+                        scope,
+                        save_state,
+                    );
+                })
+            } else {
                 stack.push(State {
                     current_num: new_num,
                     bin_num: new_bin_num,
@@ -390,107 +163,109 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
         let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
         let digit_cache = get_digit_cache(dec_length);
         let max_dec_cache = get_max_cache(dec_length, 10);
-        let lookup_table = LookupTable::new(&digit_cache);
-        let cancel = AtomicBool::new(false);
+        let mut lookup_table = LookupTable::new(&digit_cache);
 
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(usize::max(
-                rayon::current_num_threads(),
-                (max_bin_length - min_bin_length + 2) as usize,
-            ))
-            .build()
-            .unwrap();
-
-        // println!(
-        //     "{:.4}: Starting decimal length: {}",
-        //     start_time.elapsed().as_secs_f32(),
-        //     dec_length
-        // );
+        if VERBOSE {
+            println!(
+                "{:.4}: Starting decimal length: {}",
+                start_time.elapsed().as_secs_f32(),
+                dec_length
+            );
+        }
 
         let max_bin_caches: Vec<_> = (min_bin_length..=max_bin_length)
             .map(|bin_length| get_max_cache(bin_length, 2))
             .collect();
 
-        let current_tasks = AtomicUsize::new(0);
-        pool.scope_fifo(|scope| {
-            let capped_scope = CappedScope {
-                underlying_scope: scope,
-                current_tasks: &current_tasks,
-                max_tasks: 8192,
+        let mut remaining_memory =
+            sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())
+                .available_memory();
+        // println!("available memory: {:?}", remaining_memory);
+        let desired_max_cache_digits =
+            (dec_length as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64) / 2f64).floor() as u32;
+        let max_cache_digits = (remaining_memory * 8)
+            .ilog10()
+            .min(desired_max_cache_digits);
+        // let max_cache_digits = 11; //(available_memory / std::mem::size_of::<u64>() as u64).ilog10();
+        if VERBOSE {
+            println!("max_cache_digits: {desired_max_cache_digits}");
+        }
+        for num_digits in (2..=max_cache_digits).rev() {
+            let Some((downscale_factor, size)) =
+                LevelTable::calculate_memory_requirements(num_digits, remaining_memory)
+            else {
+                continue;
             };
-            let available_memory =
-                sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())
-                    .available_memory();
-            let max_cache_digits = (available_memory / std::mem::size_of::<u64>() as u64).ilog10();
-            for num_digits in 2..=max_cache_digits {
-                let digit_cache_ref = &digit_cache;
-                let cancel_ref = &cancel;
-                let lookup_table_ref = &lookup_table;
-                capped_scope.force_spawn_fifo(move |_| {
-                    if lookup_table_ref.generate(num_digits, digit_cache_ref, cancel_ref) {
-                        // println!(
-                        //     "{:.4}: Generated table for decimal length {}, num_digits: {}",
-                        //     start_time.elapsed().as_secs_f32(),
-                        //     dec_length,
-                        //     num_digits
-                        // );
-                    }
-                })
+            remaining_memory -= size;
+            if VERBOSE {
+                println!(
+                    "Generating table for decimal length {}, num_digits: {}",
+                    dec_length, num_digits
+                );
             }
-
-            pool.scope_fifo(|scope| {
-                let capped_scope = CappedScope {
-                    underlying_scope: scope,
-                    current_tasks: &current_tasks,
-                    max_tasks: 8192,
-                };
-
-                let existing_tasks = &mut save_state.lock().unwrap().tasks;
-                let tasks: Vec<SaveTask> = if existing_tasks.is_empty() {
-                    (min_bin_length..=max_bin_length)
-                        .map(|bin_length| SaveTask {
-                            stack: vec![State {
-                                current_num: u256::ZERO,
-                                bin_num: u256::ZERO,
-                                is_odd: Some(true),
-                                level: 0,
-                            }],
-                            bin_length,
-                        })
-                        .collect()
-                } else {
-                    existing_tasks.drain(..).collect()
-                };
-
-                for task in tasks {
-                    let bin_length = task.bin_length;
-                    let digit_cache_ref = &digit_cache;
-                    let max_dec_cache_ref = &max_dec_cache;
-                    let lookup_table_ref = &lookup_table;
-                    let max_bin_cache_ref = &max_bin_caches[(bin_length - min_bin_length) as usize];
-                    capped_scope.spawn_fifo(move |capped_scope| {
-                        find_palindrome_recursive(
-                            task.stack,
-                            dec_length,
-                            bin_length,
-                            digit_cache_ref,
-                            max_dec_cache_ref,
-                            max_bin_cache_ref,
-                            lookup_table_ref,
-                            start_time,
-                            capped_scope,
-                            save_state,
-                        );
-                    });
+            if lookup_table.generate(num_digits, downscale_factor, &digit_cache) {
+                let level = digit_cache.len() - num_digits as usize;
+                let instance = lookup_table.sub_caches[level].as_ref().unwrap();
+                if VERBOSE {
+                    println!(
+                        "{:.4}: Generated table for decimal length {}, num_digits: {}, size: {}, factor: {}",
+                        start_time.elapsed().as_secs_f32(),
+                        dec_length,
+                        num_digits,
+                        instance.size(),
+                        10u64.pow(num_digits) as f64 / (instance.size() * 8) as f64
+                    );
                 }
-            });
-            // println!(
-            //     "{:.4}: Finished decimal length {}",
-            //     start_time.elapsed().as_secs_f32(),
-            //     dec_length
-            // );
-            cancel.store(true, Ordering::Relaxed);
+            }
+        }
+
+        rayon::scope(|scope| {
+            let existing_tasks = &mut save_state.lock().unwrap().tasks;
+            let tasks: Vec<SaveTask> = if existing_tasks.is_empty() {
+                (min_bin_length..=max_bin_length)
+                    .map(|bin_length| SaveTask {
+                        stack: vec![State {
+                            current_num: u256::ZERO,
+                            bin_num: u256::ZERO,
+                            is_odd: Some(true),
+                            level: 0,
+                        }],
+                        bin_length,
+                    })
+                    .collect()
+            } else {
+                std::mem::take(existing_tasks)
+            };
+
+            for task in tasks {
+                let bin_length = task.bin_length;
+                let digit_cache_ref = &digit_cache;
+                let max_dec_cache_ref = &max_dec_cache;
+                let lookup_table_ref = &lookup_table;
+                let max_bin_cache_ref = &max_bin_caches[(bin_length - min_bin_length) as usize];
+                scope.spawn(move |scope| {
+                    find_palindrome_recursive(
+                        task.stack,
+                        dec_length,
+                        bin_length,
+                        digit_cache_ref,
+                        max_dec_cache_ref,
+                        max_bin_cache_ref,
+                        lookup_table_ref,
+                        start_time,
+                        scope,
+                        save_state,
+                    );
+                });
+            }
         });
+        if VERBOSE {
+            println!(
+                "{:.4}: Finished decimal length {}",
+                start_time.elapsed().as_secs_f32(),
+                dec_length
+            );
+        }
 
         if save_state.lock().unwrap().tasks.is_empty() {
             save_state.lock().unwrap().dec_length += 1;
@@ -538,14 +313,14 @@ struct SaveState {
 }
 
 fn main() {
-    let save_path_arg = std::env::args().skip(1).next();
+    let save_path_arg = std::env::args().nth(1);
     let mut save_state = Mutex::new(SaveState {
         dec_length: 1,
         tasks: vec![],
         palindromes_found: vec![],
     });
     if let Some(save_path) = &save_path_arg {
-        let load_result = std::fs::read_to_string(&save_path);
+        let load_result = std::fs::read_to_string(save_path);
         if let Ok(contents) = load_result {
             *save_state.get_mut().unwrap() = serde_json::from_str(&contents).unwrap()
         }
@@ -559,4 +334,22 @@ fn main() {
         let serialized_save_state = serde_json::to_string(&*save_state.lock().unwrap()).unwrap();
         std::fs::write(save_path, serialized_save_state).unwrap();
     }
+
+    // table_tests();
+}
+
+#[allow(dead_code)]
+fn table_tests() {
+    let digit_cache = get_digit_cache(46);
+    let mut lookup = par_bitmap_table::LookupTable::new(&digit_cache);
+    let start_time = Instant::now();
+    let num_digits = 10;
+    lookup.generate(num_digits, 3, &digit_cache);
+    let level = digit_cache.len() - num_digits as usize;
+    println!("{:.4}: Finished bitmap", start_time.elapsed().as_secs_f32());
+    let sat = lookup.sub_caches[level].as_ref().unwrap().saturation();
+    println!(
+        "{:.4}: Bitmap saturation: {sat}",
+        start_time.elapsed().as_secs_f32()
+    );
 }

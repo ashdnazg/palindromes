@@ -152,11 +152,10 @@ impl LevelTable {
 
     fn contains(&self, num: u64, known_bits: u32) -> bool {
         let known_bits = known_bits.min(self.max_lookup_bits);
-        let entry = num
-            .wrapping_shr(u64::BITS - known_bits)
-            .wrapping_shl(self.max_lookup_bits - known_bits);
+        let entry_mask = u64::MAX.wrapping_shl(u64::BITS - known_bits);
+        let entry = (num & entry_mask).wrapping_shr(u64::BITS - self.max_lookup_bits);
         let mask_bits = 1u32.wrapping_shl(self.max_lookup_bits - known_bits);
-        let mask = (1u128.wrapping_shl(mask_bits) as u64).wrapping_sub(1);
+        let mask = u64::MAX.wrapping_shr(u64::BITS - mask_bits);
         let shifted_mask = mask.wrapping_shl(entry as u32 % 64);
         self.bitmap[entry as usize / 64] & shifted_mask != 0
     }

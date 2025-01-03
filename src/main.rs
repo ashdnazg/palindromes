@@ -9,7 +9,7 @@ use std::{
     },
     time::Instant,
 };
-use sysinfo::{RefreshKind, SystemExt};
+use sysinfo::{MemoryRefreshKind, RefreshKind};
 
 mod par_bitmap_table;
 
@@ -177,9 +177,10 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
             .map(|bin_length| get_max_cache(bin_length, 2))
             .collect();
 
-        let mut remaining_memory =
-            sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())
-                .available_memory();
+        let mut remaining_memory = sysinfo::System::new_with_specifics(
+            RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
+        )
+        .available_memory();
         // println!("available memory: {:?}", remaining_memory);
         let desired_max_cache_digits =
             (dec_length as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64) / 2f64).floor() as u32;

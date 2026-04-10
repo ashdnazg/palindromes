@@ -119,6 +119,7 @@ def main():
     best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6]
     decimal_length = 1
     while True:
+        print("%08.4f: starting %d" % (time.process_time() - start_time, decimal_length))
         max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]
         lookup_table_array = create_table_array(decimal_length, max_table_digits)
         find_palindromes("", decimal_length, lookup_table_array)

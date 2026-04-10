@@ -1,4 +1,5 @@
 import itertools
+import math
 import time
 
 start_time = time.process_time()
@@ -11,33 +12,36 @@ def check_if_binary_palindrome(num):
     if bin_str == bin_str[::-1]:
         palindrome_found(num)
 
-TABLE_LEVEL = 8
+def is_in_table(subtraction_suffix, shared_bits_length, lookup_table):
+    table, log_expanded_size, current_digits_length = lookup_table
+    lookup_bits_length = shared_bits_length - current_digits_length
+    if lookup_bits_length <= 0:
+        return True
 
-MOD = 5**TABLE_LEVEL
+    mask = ((1 << lookup_bits_length) - 1) << (64 - lookup_bits_length)
+    lookup_number = int(bin(subtraction_suffix >> current_digits_length)[:1:-1].ljust(64, "0"), 2) & mask
+    guess_index = lookup_number >> (64 - log_expanded_size)
+    while guess_index < len(table):
+        value = table[guess_index]
+        if value >= lookup_number:
+            return value & mask == lookup_number
 
-def is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, binary_length, known_digits, lookup_table_dict):
-    if known_digits < TABLE_LEVEL:
-        return False
+        guess_index += 1
 
+    return False
+
+
+
+def is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table):
     nonshared_bits_length = (max_decimal_palindrome ^ min_decimal_palindrome).bit_length()
-    unknown_bits = nonshared_bits_length - binary_length // 2
-
-    if binary_length not in lookup_table_dict:
-        lookup_table_dict[binary_length] = populate_remainder_table(binary_length, MOD)
-
-    lookup_table = lookup_table_dict[binary_length]
-
-    shifted = min_decimal_palindrome >> nonshared_bits_length
-    shared_most_significant_bits = bin(shifted)[2:]
+    shared_most_significant_bits = bin(min_decimal_palindrome >> nonshared_bits_length)[2:]
     hypothetical_least_significant_bits = int(shared_most_significant_bits[::-1], 2)
-    known_bits = shifted << nonshared_bits_length | hypothetical_least_significant_bits
+    subtraction_result = hypothetical_least_significant_bits - min_decimal_palindrome
+    subtraction_least_significant_bits = subtraction_result % (1 << len(shared_most_significant_bits))
 
-    subtraction_result = min_decimal_palindrome - known_bits
-    mod = subtraction_result % MOD
+    return not is_in_table(subtraction_least_significant_bits, len(shared_most_significant_bits), lookup_table)
 
-    return lookup_table[mod] > unknown_bits
-
-def is_pruned(decimal_digits, decimal_length, lookup_table_dict):
+def is_pruned(decimal_digits, decimal_length, lookup_table_array, remainder_table_dict):
     changing_decimal_length = decimal_length - 2 * len(decimal_digits)
     min_decimal_palindrome = int(decimal_digits + "0" * changing_decimal_length + decimal_digits[::-1])
     max_decimal_palindrome = int(decimal_digits + "9" * changing_decimal_length + decimal_digits[::-1])
@@ -55,15 +59,75 @@ def is_pruned(decimal_digits, decimal_length, lookup_table_dict):
     if min_binary_palindrome > max_decimal_palindrome or max_binary_palindrome < min_decimal_palindrome:
         return True
 
-    return is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, binary_length, len(decimal_digits), lookup_table_dict)
+    lookup_table = lookup_table_array[len(decimal_digits)]
 
-def find_palindromes(current_digits, decimal_length, lookup_table_dict):
+    if lookup_table and is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table):
+        return True
+
+    if is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, len(decimal_digits), remainder_table_dict):
+        return True
+
+    return False
+
+def is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, known_digits, remainder_table_dict):
+    nonshared_bits_length = (max_decimal_palindrome ^ min_decimal_palindrome).bit_length()
+    unknown_bits = nonshared_bits_length - binary_length // 2
+
+    wanted_digits = math.ceil(math.log(1 << unknown_bits, 5))
+    if known_digits < wanted_digits:
+        return False
+
+    digits = min(min(known_digits, wanted_digits + 4), 8)
+    mod = 5**digits
+
+    if (binary_length, mod) not in remainder_table_dict:
+        remainder_table_dict[(binary_length, mod)] = populate_remainder_table(binary_length, mod)
+
+    lookup_table = remainder_table_dict[(binary_length, mod)]
+
+    shifted = min_decimal_palindrome >> nonshared_bits_length
+    shared_most_significant_bits = bin(shifted)[2:]
+    hypothetical_least_significant_bits = int(shared_most_significant_bits[::-1], 2)
+    known_bits = shifted << nonshared_bits_length | hypothetical_least_significant_bits
+
+    subtraction_result = min_decimal_palindrome - known_bits
+    mod = subtraction_result % mod
+
+    return lookup_table[mod] > unknown_bits
+
+def populate_remainder_table(bin_length, mod):
+    mods = []
+    for i in range((bin_length + 1) // 2):
+        idx1 = bin_length - 1 - i
+        idx2 = i
+        if idx1 == idx2:
+            mod_value = (1 << idx1) % mod
+        else:
+            mod_value = ((1 << idx1) + (1 << idx2)) % mod
+        mods.append(mod_value)
+
+    ret = [255] * mod
+    count = 1
+    ret[0] = 0
+    for i, mod_value in enumerate(mods[::-1]):
+        for j in range(mod):
+            if ret[j] < i + 1:
+                new_mod = (j + mod_value) % mod
+                if ret[new_mod] == 255:
+                    ret[new_mod] = i + 1
+                    count += 1
+        if count == mod:
+            break
+
+    return ret
+
+def find_palindromes(current_digits, decimal_length, lookup_table_array, remainder_table_dict):
     if len(current_digits) * 2 >= decimal_length:
         digits_remaining = decimal_length - len(current_digits)
         check_if_binary_palindrome(int(current_digits[:digits_remaining] + current_digits[::-1]))
         return
 
-    if current_digits and is_pruned(current_digits, decimal_length, lookup_table_dict):
+    if current_digits and is_pruned(current_digits, decimal_length, lookup_table_array, remainder_table_dict):
         return
 
     if len(current_digits) == 0:
@@ -73,7 +137,41 @@ def find_palindromes(current_digits, decimal_length, lookup_table_dict):
 
     for digit in digits:
         new_digits = current_digits + str(digit)
-        find_palindromes(new_digits, decimal_length, lookup_table_dict)
+        find_palindromes(new_digits, decimal_length, lookup_table_array, remainder_table_dict)
+
+MIN_TABLE_DIGITS = 2
+
+def create_table_array(decimal_length, max_table_digits):
+    digit_cache = []
+    for i in range((decimal_length + 1) // 2):
+        j = decimal_length - i - 1
+        digit_cache.append(10**i)
+        if i != j:
+            digit_cache[-1] += 10**j
+
+    max_table_digits = min(len(digit_cache), max_table_digits)
+
+    table_array = [None] * (len(digit_cache) + 1)
+    for digits_remaining in range(MIN_TABLE_DIGITS, max_table_digits + 1):
+        current_digits_length = len(digit_cache) - digits_remaining
+        suffixes = [
+            int(bin(sum(multipliers[-i] * digit_cache[-i] for i in range(digits_remaining, 0, -1)) >> current_digits_length)[:1:-1].ljust(64, "0"), 2)
+            for multipliers in itertools.product(range(10), repeat=digits_remaining)
+        ]
+        suffixes.sort()
+        log_expanded_size = len(suffixes).bit_length()
+        expanded_size = 1 << log_expanded_size
+        table = []
+        for suffix in suffixes:
+            wanted_index = suffix >> (64 - log_expanded_size)
+            while True:
+                table.append(suffix)
+                if wanted_index < len(table):
+                    break
+
+        table_array[current_digits_length] = (table, log_expanded_size, current_digits_length)
+
+    return table_array
 
 def populate_remainder_table(bin_length, mod):
     mods = []
@@ -102,10 +200,14 @@ def populate_remainder_table(bin_length, mod):
     return ret
 
 def main():
+    # Blatant cheating, created using pruned_profile.py
+    best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6]
     decimal_length = 1
     while True:
-        lookup_table_dict = {}
-        find_palindromes("", decimal_length, lookup_table_dict)
+        print("%08.4f: starting %d" % (time.process_time() - start_time, decimal_length))
+        max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]
+        lookup_table_array = create_table_array(decimal_length, max_table_digits)
+        find_palindromes("", decimal_length, lookup_table_array, {})
         decimal_length += 1
 
 

@@ -31,6 +31,8 @@ def is_in_table(subtraction_suffix, shared_bits_length, lookup_table):
     return False
 
 
+STATS = [0, 0, 0, 0]
+WANTED_DIGITS = [0] * 15
 
 def is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table):
     nonshared_bits_length = (max_decimal_palindrome ^ min_decimal_palindrome).bit_length()
@@ -61,26 +63,34 @@ def is_pruned(decimal_digits, decimal_length, lookup_table_array, remainder_tabl
 
     lookup_table = lookup_table_array[len(decimal_digits)]
 
-    if lookup_table and is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table):
-        return True
+    ret1 = lookup_table is not None and is_pruned_by_table(min_decimal_palindrome, max_decimal_palindrome, lookup_table)
 
-    if is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, len(decimal_digits), remainder_table_dict):
-        return True
+    ret2 = is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, decimal_length, len(decimal_digits), remainder_table_dict)
 
-    return False
+    STATS[int(ret1) + int(ret2) * 2] += 1
 
-def is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, known_digits, remainder_table_dict):
+    return ret1 or ret2
+
+def is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binary_length, decimal_length, known_digits, remainder_table_dict):
     nonshared_bits_length = (max_decimal_palindrome ^ min_decimal_palindrome).bit_length()
     unknown_bits = nonshared_bits_length - binary_length // 2
 
-    wanted_digits = math.ceil(math.log(1 << unknown_bits, 5))
+    if decimal_length & 1 == 1:
+        multiplier = 1
+    else:
+        multiplier = 11
+
+    wanted_digits = math.ceil(math.log((1 << unknown_bits) / multiplier, 5))
     if known_digits < wanted_digits:
         return False
 
-    digits = min(min(known_digits, wanted_digits + 4), 8)
-    mod = 5**digits
+    WANTED_DIGITS[min(known_digits, wanted_digits)] += 1
+
+    digits = min(known_digits, 9)
+    mod = multiplier * (5**digits)
 
     if (binary_length, mod) not in remainder_table_dict:
+        print("%08.4f: populating remainder table for binary length %d and mod %d" % (time.process_time() - start_time, binary_length, mod))
         remainder_table_dict[(binary_length, mod)] = populate_remainder_table(binary_length, mod)
 
     lookup_table = remainder_table_dict[(binary_length, mod)]
@@ -91,9 +101,9 @@ def is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binar
     known_bits = shifted << nonshared_bits_length | hypothetical_least_significant_bits
 
     subtraction_result = min_decimal_palindrome - known_bits
-    mod = subtraction_result % mod
+    remainder = subtraction_result % mod
 
-    return lookup_table[mod] > unknown_bits
+    return lookup_table[remainder] > unknown_bits
 
 def populate_remainder_table(bin_length, mod):
     mods = []
@@ -201,14 +211,17 @@ def populate_remainder_table(bin_length, mod):
 
 def main():
     # Blatant cheating, created using pruned_profile.py
-    best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6]
-    decimal_length = 1
+    # best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 7]
+    decimal_length = 25
     while True:
         print("%08.4f: starting %d" % (time.process_time() - start_time, decimal_length))
-        max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]
-        lookup_table_array = create_table_array(decimal_length, max_table_digits)
+        # max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]
+        lookup_table_array = create_table_array(decimal_length, 6)
         find_palindromes("", decimal_length, lookup_table_array, {})
         decimal_length += 1
+        print(STATS)
+        print(sum(STATS))
+        print(WANTED_DIGITS)
 
 
 if __name__ == '__main__':

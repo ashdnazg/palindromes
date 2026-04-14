@@ -117,7 +117,7 @@ def create_table_array(decimal_length, max_table_digits):
 def main():
     # Blatant cheating, created using pruned_profile.py
     best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6]
-    decimal_length = 1
+    decimal_length = 26
     while True:
         print("%08.4f: starting %d" % (time.process_time() - start_time, decimal_length))
         max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]

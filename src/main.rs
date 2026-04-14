@@ -187,7 +187,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
         .available_memory();
         // println!("available memory: {:?}", remaining_memory);
         let desired_max_cache_digits =
-            (dec_length as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64) / 2f64).floor() as u32;
+            ((dec_length / 2) as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64)).floor() as u32;
         let max_cache_digits = (remaining_memory * 8)
             .ilog10()
             .min(desired_max_cache_digits);
@@ -345,16 +345,18 @@ fn main() {
 
 #[allow(dead_code)]
 fn table_tests() {
-    let digit_cache = get_digit_cache(46);
+    let digit_cache = get_digit_cache(34);
     let mut lookup = par_bitmap_table::LookupTable::new(&digit_cache);
     let start_time = Instant::now();
-    let num_digits = 10;
-    lookup.generate(num_digits, 3, &digit_cache);
-    let level = digit_cache.len() - num_digits as usize;
-    println!("{:.4}: Finished bitmap", start_time.elapsed().as_secs_f32());
-    let sat = lookup.sub_caches[level].as_ref().unwrap().saturation();
-    println!(
-        "{:.4}: Bitmap saturation: {sat}",
-        start_time.elapsed().as_secs_f32()
-    );
+    let num_digits = 7;
+    for i in 0..=8 {
+        lookup.generate(num_digits, i, &digit_cache);
+        let level = digit_cache.len() - num_digits as usize;
+        println!("{:.4}: Finished bitmap {i}", start_time.elapsed().as_secs_f32());
+        let sat = lookup.sub_caches[level].as_ref().unwrap().saturation();
+        println!(
+            "{:.4}: Bitmap {i} saturation: {sat}",
+            start_time.elapsed().as_secs_f32()
+        );
+    }
 }

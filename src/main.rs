@@ -12,10 +12,13 @@ use std::{
 use sysinfo::{MemoryRefreshKind, RefreshKind};
 
 mod par_bitmap_table;
+mod remainder_table;
 
 use par_bitmap_table::{LevelTable, LookupTable};
 
-const VERBOSE: bool = false;
+use crate::remainder_table::RemainderTable;
+
+const VERBOSE: bool = true;
 
 pub trait Bits {
     fn bits(&self) -> u32;
@@ -55,6 +58,7 @@ fn find_palindrome_recursive<'scope>(
     max_dec_cache: &'scope [u256],
     max_bin_cache: &'scope [u256],
     lookup_table: &'scope LookupTable,
+    remainder_table: &'scope RemainderTable,
     start_time: Instant,
     scope: &Scope<'scope>,
     save_state: &'scope Mutex<SaveState>,
@@ -117,6 +121,10 @@ fn find_palindrome_recursive<'scope>(
                 continue;
             }
 
+            if !remainder_table.lookup(new_num, level + 1, msb_set_bits as u32, bin_length) {
+                continue;
+            }
+
             let is_odd = if msb_set_bits <= (level as i32 + 1) {
                 None
             } else {
@@ -139,6 +147,7 @@ fn find_palindrome_recursive<'scope>(
                         max_dec_cache,
                         max_bin_cache,
                         lookup_table,
+                        remainder_table,
                         start_time,
                         scope,
                         save_state,
@@ -186,6 +195,11 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
         )
         .available_memory();
         // println!("available memory: {:?}", remaining_memory);
+        let max_remainder_digits = ((dec_length / 2) as f64 * (1.0 + 5f64.log2()) / (2f64 * 5f64.log2() + 1f64)).floor() as u32;
+        let remainder_tables: Vec<_> = (min_bin_length..=max_bin_length)
+            .map(|bin_length| RemainderTable::new(bin_length, max_remainder_digits))
+            .collect();
+
         let desired_max_cache_digits =
             ((dec_length / 2) as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64)).floor() as u32;
         let max_cache_digits = (remaining_memory * 8)
@@ -202,25 +216,25 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
                 continue;
             };
             remaining_memory -= size;
-            if VERBOSE {
-                println!(
-                    "Generating table for decimal length {}, num_digits: {}",
-                    dec_length, num_digits
-                );
-            }
+            // if VERBOSE {
+            //     println!(
+            //         "Generating table for decimal length {}, num_digits: {}",
+            //         dec_length, num_digits
+            //     );
+            // }
             if lookup_table.generate(num_digits, downscale_factor, &digit_cache) {
                 let level = digit_cache.len() - num_digits as usize;
                 let instance = lookup_table.sub_caches[level].as_ref().unwrap();
-                if VERBOSE {
-                    println!(
-                        "{:.4}: Generated table for decimal length {}, num_digits: {}, size: {}, factor: {}",
-                        start_time.elapsed().as_secs_f32(),
-                        dec_length,
-                        num_digits,
-                        instance.size(),
-                        10u64.pow(num_digits) as f64 / (instance.size() * 8) as f64
-                    );
-                }
+                // if VERBOSE {
+                //     println!(
+                //         "{:.4}: Generated table for decimal length {}, num_digits: {}, size: {}, factor: {}",
+                //         start_time.elapsed().as_secs_f32(),
+                //         dec_length,
+                //         num_digits,
+                //         instance.size(),
+                //         10u64.pow(num_digits) as f64 / (instance.size() * 8) as f64
+                //     );
+                // }
             }
         }
 
@@ -247,6 +261,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
                 let digit_cache_ref = &digit_cache;
                 let max_dec_cache_ref = &max_dec_cache;
                 let lookup_table_ref = &lookup_table;
+                let remainder_table_ref = &remainder_tables[(bin_length - min_bin_length) as usize];
                 let max_bin_cache_ref = &max_bin_caches[(bin_length - min_bin_length) as usize];
                 scope.spawn(move |scope| {
                     find_palindrome_recursive(
@@ -257,6 +272,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
                         max_dec_cache_ref,
                         max_bin_cache_ref,
                         lookup_table_ref,
+                        remainder_table_ref,
                         start_time,
                         scope,
                         save_state,

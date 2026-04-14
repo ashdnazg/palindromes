@@ -160,7 +160,11 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
     loop {
         let dec_length = save_state.lock().unwrap().dec_length;
         let max_bin_length = (u256::from(10u32).pow(dec_length) - 1).bits();
-        let min_bin_length = (u256::from(10u32).pow(dec_length - 1) + 1).bits();
+        let min_bin_length = if dec_length == 1 {
+            1
+        } else {
+            (u256::from(10u32).pow(dec_length - 1) + 1).bits()
+        };
         let digit_cache = get_digit_cache(dec_length);
         let max_dec_cache = get_max_cache(dec_length, 10);
         let mut lookup_table = LookupTable::new(&digit_cache);

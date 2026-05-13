@@ -42,8 +42,8 @@ fn create_level(binary_length: u32, divisor: u64) -> Vec<u8> {
 }
 
 impl RemainderTable {
-    pub fn new(binary_length: u32, max_digit_count: u32) -> Self {
-        let multiplier = if binary_length & 1 == 0 {
+    pub fn new(binary_length: u32, decimal_length: u32, max_digit_count: u32) -> Self {
+        let multiplier = if decimal_length & 1 == 0 {
             11
         } else {
             1
@@ -63,6 +63,9 @@ impl RemainderTable {
         let unknown_bits = binary_length - known_bits * 2;
         let level_table = &self.tables[(level as usize).min(self.tables.len() - 1)];
         let divisor = level_table.len();
+        if current_num == 910303019 {
+            println!("unknown_bits: {unknown_bits}, divisor: {divisor}");
+        }
         if 1 << unknown_bits > divisor {
             return true;
         }
@@ -73,6 +76,11 @@ impl RemainderTable {
         let known_binary_num = shifted_back | reversed_shifted;
         let subtracted = current_num - known_binary_num;
         let remainder = *(subtracted % divisor as u128).low() as usize;
+        if current_num == 910303019 {
+            println!("known_binary_num: {known_binary_num:b}, current_num: {current_num:b} known_bits: {known_bits}");
+            println!("remainder: {remainder}");
+            println!("level_table[remainder]: {}", level_table[remainder]);
+        }
 
         level_table[remainder] as u32 <= unknown_bits
     }

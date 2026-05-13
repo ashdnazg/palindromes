@@ -89,6 +89,10 @@ def is_pruned_by_remainder(min_decimal_palindrome, max_decimal_palindrome, binar
     digits = min(known_digits, 9)
     mod = multiplier * (5**digits)
 
+    if min_decimal_palindrome == 910303019:
+        print(f"unknown_bits: {unknown_bits}, divisor: {mod} unknown_bits:{binary_length - nonshared_bits_length}")
+        exit(1)
+
     if (binary_length, mod) not in remainder_table_dict:
         print("%08.4f: populating remainder table for binary length %d and mod %d" % (time.process_time() - start_time, binary_length, mod))
         remainder_table_dict[(binary_length, mod)] = populate_remainder_table(binary_length, mod)
@@ -212,7 +216,7 @@ def populate_remainder_table(bin_length, mod):
 def main():
     # Blatant cheating, created using pruned_profile.py
     # best_max_table_digits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 7]
-    decimal_length = 25
+    decimal_length = 9
     while True:
         print("%08.4f: starting %d" % (time.process_time() - start_time, decimal_length))
         # max_table_digits = best_max_table_digits[min(decimal_length, len(best_max_table_digits) - 1)]

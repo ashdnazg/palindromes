@@ -18,7 +18,7 @@ use par_bitmap_table::{LevelTable, LookupTable};
 
 use crate::remainder_table::RemainderTable;
 
-const VERBOSE: bool = true;
+const VERBOSE: bool = false;
 
 pub trait Bits {
     fn bits(&self) -> u32;
@@ -122,6 +122,9 @@ fn find_palindrome_recursive<'scope>(
             }
 
             if !remainder_table.lookup(new_num, level + 1, msb_set_bits as u32, bin_length) {
+                if new_num <= 910373019 && new_max_dec >= 910373019 {
+                    panic!("Shouldn't have pruned {new_num} {level} msb_set_bits:{msb_set_bits} {bin_length}");
+                }
                 continue;
             }
 
@@ -197,8 +200,14 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
         // println!("available memory: {:?}", remaining_memory);
         let max_remainder_digits = ((dec_length / 2) as f64 * (1.0 + 5f64.log2()) / (2f64 * 5f64.log2() + 1f64)).floor() as u32;
         let remainder_tables: Vec<_> = (min_bin_length..=max_bin_length)
-            .map(|bin_length| RemainderTable::new(bin_length, max_remainder_digits))
+            .map(|bin_length| RemainderTable::new(bin_length, dec_length, max_remainder_digits))
             .collect();
+        if VERBOSE {
+            println!(
+                "{:.4}: Finished generating remainder digits",
+                start_time.elapsed().as_secs_f32(),
+            );
+        }
 
         let desired_max_cache_digits =
             ((dec_length / 2) as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64)).floor() as u32;
@@ -207,7 +216,7 @@ fn find_palindrome(save_state: &Mutex<SaveState>, start_time: Instant) {
             .min(desired_max_cache_digits);
         // let max_cache_digits = 11; //(available_memory / std::mem::size_of::<u64>() as u64).ilog10();
         if VERBOSE {
-            println!("max_cache_digits: {desired_max_cache_digits}");
+            println!("desired_max_cache_digits: {desired_max_cache_digits}");
         }
         for num_digits in (2..=max_cache_digits).rev() {
             let Some((downscale_factor, size)) =

@@ -3,11 +3,9 @@ use ethnum::u256;
 use rayon::Scope;
 use serde::{Deserialize, Serialize};
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex,
-    },
-    time::Instant,
+    mem, sync::{
+        Mutex, atomic::{AtomicBool, Ordering},
+    }, time::Instant,
 };
 use sysinfo::{MemoryRefreshKind, RefreshKind};
 
@@ -46,6 +44,59 @@ struct State {
     is_odd: Option<bool>,
     level: u32,
 }
+
+fn expand(
+    numbers: &[u256],
+    level: u32,
+    dec_length: u32,
+    bin_length: u32,
+    digit_cache: &[[u256; 10]],
+    max_dec_cache: &[u256],
+    arrived: &mut Vec<u256>,
+    remaining: &mut Vec<u256>,
+) {
+    let digit_cache = digit_cache[level as usize];
+    for current_num in numbers {
+        let start = (level == 0) as usize;
+        let max_dec_add = max_dec_cache[level as usize];
+        for digit in start..=9 {
+            let new_num = current_num + digit_cache[digit];
+            let mask = (1 << (level + 1)) - 1;
+            let suffix = *new_num.low() as u64 & mask;
+            let max_top_bin = (suffix | !mask).reverse_bits();
+            let current_top = if bin_length < 64 {
+                (*new_num.low() as u64) << (64 - bin_length)
+            } else {
+                *(new_num >> (bin_length - 64)).low() as u64
+            };
+            if max_top_bin < current_top {
+                continue;
+            }
+
+            let new_top_bin = suffix.reverse_bits();
+            let new_max_dec = new_num + max_dec_add;
+
+            let max_top_dec = if bin_length < 64 {
+                (*new_max_dec.low() as u64) << (64 - bin_length)
+            } else {
+                *(new_max_dec >> (bin_length - 64)).low() as u64
+            };
+
+
+            if max_top_dec < new_top_bin {
+                continue;
+            }
+            let xored = current_num ^ new_max_dec;
+            let msb_set_bits = bin_length - xored.bits();
+            if msb_set_bits >= (dec_length + 1) / 2 {
+                arrived.push(new_num);
+            } else {
+                remaining.push(new_num);
+            }
+        }
+    }
+}
+
 
 fn find_palindrome_recursive<'scope>(
     mut stack: Vec<State>,
@@ -317,28 +368,86 @@ struct SaveState {
     palindromes_found: Vec<u256>,
 }
 
-fn main() {
-    let save_path_arg = std::env::args().nth(1);
-    let mut save_state = Mutex::new(SaveState {
-        dec_length: 1,
-        tasks: vec![],
-        palindromes_found: vec![],
-    });
-    if let Some(save_path) = &save_path_arg {
-        let load_result = std::fs::read_to_string(save_path);
-        if let Ok(contents) = load_result {
-            *save_state.get_mut().unwrap() = serde_json::from_str(&contents).unwrap()
+fn new_find(dec_length: u32, bin_length: u32) {
+    let half_length = (dec_length + 1) / 2;
+    let digit_cache = get_digit_cache(dec_length);
+    let max_dec_cache = get_max_cache(dec_length, 10);
+    let mut remaining = vec![u256::ZERO];
+    let mut all_arrived = vec![];
+    let desired_max_cache_digits =
+        (dec_length as f64 * 5f64.log2() / (2f64 * 5f64.log2() + 1f64) / 2f64).floor() as u32;
+    let front_search = half_length - desired_max_cache_digits;
+    println!("desired_max_cache_digits: {desired_max_cache_digits}");
+    for level in 0..(half_length - 1) {
+        let mut new_arrived = vec![];
+        let mut new_remaining = vec![];
+        expand(&remaining, level, dec_length, bin_length, &digit_cache, &max_dec_cache, &mut new_arrived, &mut new_remaining);
+        if level + 1 < front_search {
+            let mid_size = front_search - level - 1;
+            println!("mid size: {mid_size}");
+            let start_bucket_size = new_arrived.len() >> (mid_size + desired_max_cache_digits);
+            let mid_bucket_size = 10usize.pow(mid_size) >> desired_max_cache_digits;
+            println!("start_bucket_size: {start_bucket_size}");
+            println!("mid_bucket_size: {mid_bucket_size}");
+            let current_sum_size = start_bucket_size + mid_bucket_size;
+            let next_sum_size = start_bucket_size * 10 + mid_bucket_size / 10;
+            if current_sum_size > next_sum_size {
+                new_remaining.extend(new_arrived.drain(..));
+            }
         }
+        mem::swap(&mut remaining, &mut new_remaining);
+        println!("done level {level}");
+        println!("remaining.len(): {}", remaining.len());
+        println!("new_arrived.len(): {}", new_arrived.len());
+        new_arrived.sort_unstable_by_key(|num| {
+            let current_bits = *(num >> (level + 1)).low() as u64;
+            let shift = bin_length as i32 - (level + 1) as i32 - 64;
+            let final_bits = (if shift > 0 {
+                *(num >> shift).low() as u64
+            } else {
+                (*num.low() as u64) << -shift
+            })
+            .reverse_bits();
 
-        ctrlc::set_handler(move || TERMINATE.store(true, Ordering::Relaxed))
-            .expect("Error setting Ctrl-C handler");
+            final_bits.wrapping_sub(current_bits).reverse_bits()
+        });
+        all_arrived.push(new_arrived);
     }
-    let start_time = Instant::now();
-    find_palindrome(&save_state, start_time);
-    if let Some(save_path) = &save_path_arg {
-        let serialized_save_state = serde_json::to_string(&*save_state.lock().unwrap()).unwrap();
-        std::fs::write(save_path, serialized_save_state).unwrap();
+    println!("remaining.len(): {}", remaining.len());
+    println!("all_arrived lengths:");
+    let mut total = 0;
+    for (i, arrived) in all_arrived.iter().enumerate() {
+        if arrived.len() != 0 {
+            println!("{i}: {}", arrived.len());
+            total += arrived.len();
+        }
     }
+    println!("total: {}", total);
+}
+
+fn main() {
+    // let save_path_arg = std::env::args().nth(1);
+    // let mut save_state = Mutex::new(SaveState {
+    //     dec_length: 1,
+    //     tasks: vec![],
+    //     palindromes_found: vec![],
+    // });
+    // if let Some(save_path) = &save_path_arg {
+    //     let load_result = std::fs::read_to_string(save_path);
+    //     if let Ok(contents) = load_result {
+    //         *save_state.get_mut().unwrap() = serde_json::from_str(&contents).unwrap()
+    //     }
+
+    //     ctrlc::set_handler(move || TERMINATE.store(true, Ordering::Relaxed))
+    //         .expect("Error setting Ctrl-C handler");
+    // }
+    // let start_time = Instant::now();
+    // find_palindrome(&save_state, start_time);
+    // if let Some(save_path) = &save_path_arg {
+    //     let serialized_save_state = serde_json::to_string(&*save_state.lock().unwrap()).unwrap();
+    //     std::fs::write(save_path, serialized_save_state).unwrap();
+    // }
+    new_find(55, 183);
 
     // table_tests();
 }

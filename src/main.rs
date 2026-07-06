@@ -384,14 +384,9 @@ fn new_find(dec_length: u32, bin_length: u32) {
         expand(&remaining, level, dec_length, bin_length, &digit_cache, &max_dec_cache, &mut new_arrived, &mut new_remaining);
         if level + 1 < front_search {
             let mid_size = front_search - level - 1;
-            println!("mid size: {mid_size}");
-            let start_bucket_size = new_arrived.len() >> (mid_size + desired_max_cache_digits);
-            let mid_bucket_size = 10usize.pow(mid_size) >> desired_max_cache_digits;
-            println!("start_bucket_size: {start_bucket_size}");
-            println!("mid_bucket_size: {mid_bucket_size}");
-            let current_sum_size = start_bucket_size + mid_bucket_size;
-            let next_sum_size = start_bucket_size * 10 + mid_bucket_size / 10;
-            if current_sum_size > next_sum_size {
+            let current_size = new_arrived.len() + 10usize.pow(mid_size);
+            let next_size = new_arrived.len() * 5;
+            if current_size > next_size {
                 new_remaining.extend(new_arrived.drain(..));
             }
         }
